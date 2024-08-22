@@ -12,8 +12,9 @@ Ran and tested on a ubuntu-based linux machine with conda.
 A GPU supported machine is required for training and testing.
 
 ```
-conda create -n ENV_NAME python=3 --file requirements.txt
+conda create -n ENV_NAME python=3 --file package_list.txt
 conda activate ENV_NAME
+pip install -r requirements.txt
 ```
 ```
 cd data && pip install -e .
