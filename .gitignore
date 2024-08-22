@@ -17,8 +17,8 @@ data/category_bins/
 data/metrics/
 data/ts/
 data/switchboard/*.png
-gptonly/trained_model
-pairwiseturngpt/trained_model
+gptonly/trained_model/*.pt
+pairwiseturngpt/trained_model/*.pt
 model/
 *.egg-info/
 build/
