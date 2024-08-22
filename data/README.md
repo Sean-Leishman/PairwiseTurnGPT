@@ -4,7 +4,7 @@
 Switchboard is the main dataset used in this project. It is a collection of telephone conversations between two speakers.
 We use a licensed version of the Switchboard dataset which is available from LDC.
 For our purposes, we provide the dataset via Git LFS to ensure the data is of a small size and can be easily downloaded.
-After cloning the repository you can download the data by running `git lfs fetch --all` and running `bash data/switchboard/extract_swb.sh` to extract the data.
+After cloning the repository you can download the data by running `bash data/switchboard/extract_swb.sh` to extract the data.
 
 ## PairwiseGenerationDM
 The main source of data for PairwiseTurnGPT. 
