@@ -23,5 +23,5 @@ model/
 *.egg-info/
 build/
 *.pt
-data/.cache/*
 **/wandb/
+data/.cache/GPT2TokenizerFast
