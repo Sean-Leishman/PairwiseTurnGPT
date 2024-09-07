@@ -1,7 +1,11 @@
 # PairwiseTurnGPT
 
-This repository contains the code for PairwiseTurnGPT, an End-of-turn detection model trained on the Switchboard corpus.
-Turnip Thorn is based on the work of [TurnGPT](https://github.com/ErikEkstedt/TurnGPT).
+This repository contains the code for PairwiseTurnGPT, an End-of-turn detection model trained on the Switchboard corpus
+PairwiseTurnGPT is based on the work of [TurnGPT](https://github.com/ErikEkstedt/TurnGPT) but modifies the model and spoken dialogue processing to effectively model speaker interactions in overlapping utterances.
+
+This allows us to utilize phenomena such as backchannels, interruptions and overlaps in predicting end-of-turns in spoken dialogues without the need for acoustic features. 
+
+The model itself is based on the GPT-2 architecture but uses a dual-transformer approach to model each speaker's utterances separately. 
 
 For easy comparison, the original TurnGPT model has been cloned in this repository within the `gptonly` folder.
 The `pairwisegpt` folder contains the code for PairwiseTurnGPT.
@@ -26,7 +30,8 @@ pip install -e .
 ## File Structure
 There are two main folders `gptonly`, for TurnGPT, and `pairwisegpt` for PairwiseTurnGPT. 
 Here follows the contents of said folders with reference to where code has not been 
-modified for this project. (https://github.com/ErikEkstedt/TurnGPT)
+modified for this project.
+
 Each contains:
 - tokenizer.py: written for the original [TurnGPT](https://github.com/ErikEkstedt/TurnGPT)
 - train.py: contains entry code
