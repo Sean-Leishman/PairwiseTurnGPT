@@ -51,6 +51,7 @@ The data folder contains the necessary code for loading and running functions
 
 ## Data
 Switchboard data is aquired from [https://www.inf.ed.ac.uk/resources/corpora/](https://www.inf.ed.ac.uk/resources/corpora/) for Switchboard. 
+But alternatively a download script is provided in [data/switchboard/extract_swb.bash](data/switchboard/extract_swb.bash) to download the data.
 More information can be found at `data/README.md` and `data/switchboard/README.md`.
 Interact with the data subfolder directly to understand how the data is loaded and tokenized.
 
