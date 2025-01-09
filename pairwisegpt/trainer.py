@@ -1141,9 +1141,6 @@ class Trainer:
                 mask_specialB = torch.logical_not(
                     torch.logical_or(input_idsB == eint, input_idsB == ebc))
 
-            bc_maskA, bc_maskB = get_turn_after_bc(
-                input_idsA, input_idsB, eot_items, eint=eint, ebc=ebc)
-
         if not self.evaluate_on_full and (self.serialise_data or self.no_emp_tokens):
             # Remove where <eot> tokens appear
             overlap_maskA = torch.logical_or(

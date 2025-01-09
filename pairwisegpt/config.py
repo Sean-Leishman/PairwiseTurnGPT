@@ -8,6 +8,7 @@ DEFAULT = ['--batch-size', '4', '--pretrained', 'gpt2', '--finetune', '--cuda',
            '--random-seed', '512',
            '--learning-rate', '0.0000625',
            '--remove-emp-metric-generation',
+           '--evaluate-on-full',
            '--include-speaker-embeddings', '--pretrained-learning-rate', '0.0000625']
 
 EXPERIMENT_1 = [
@@ -50,6 +51,25 @@ TIMING = [
     ['--run-name', 'TIME_ALIGNED',
      '--evaluate-on-full',
      '--remove-start-tokens'],
+]
+
+EXPERIMENT_2A = [
+    # Time Aligned With Backchannels
+    ['--run-name', 'TIME ALIGNED WITH BACKCHANNELS',
+        '--remove-overlaps', '--remove-start-tokens'],
+    # Time Aligned With Overlaps
+    ['--run-name', 'TIME ALIGNED WITH OVERLAPS',
+        '--remove-backchannels', '--remove-start-tokens'],
+    # Time Aligned With Overlaps and Backchannels
+    ['--run-name', 'TIME_ALIGNED WITH BACKCHANNELS & OVERLAPS''--remove-start-tokens'],
+    # Single Stream
+    ['--run-name', 'NO TIME ALIGNMENT', '--no-emp-tokens',
+     '--remove-overlap', '--remove-cross-attention', '--include-yield-token'],
+    # Time Aligned Without Backchannels or Overlaps
+    ['--run-name', 'TIME ALIGNED', '--remove-backchannels',
+        '--remove-overlaps', '--remove-start-tokens'],
+    # Serialised
+    ['--run-name', 'TOKEN SERIALISED', '--serialise-data', '--remove-overlaps'],
 ]
 
 # Yield token enabled evaluated over the Time Aligned With Backchnnels & Overlaps dataset
@@ -100,6 +120,7 @@ CONFIGS = {
     'experiment1': EXPERIMENT_1,
     'experiment2': EXPERIMENT_2,
     'experiment3': EXPERIMENT_3,
+    'experiment2a': EXPERIMENT_2A,
 }
 
 

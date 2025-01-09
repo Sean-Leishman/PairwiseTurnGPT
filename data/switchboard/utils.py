@@ -20,9 +20,7 @@ BACKCHANNELS = [
     "oh really",
     "umhum umhum",
     "uhhuh uhhuh",
-    "oh uhhuh"
-    "uh"
-    "uhhuh uhhuh",
+    "oh uhhuh" "uh" "uhhuh uhhuh",
 ]
 
 
@@ -42,9 +40,9 @@ def _read_transcript_line(line):
 
 def _return_overlap(textA, textB, startA, startB, endA, endB):
     if startA > startB and endA < endB:
-        return textA, 'A'
+        return textA, "A"
     elif startB > startA and endB < endA:
-        return textB, 'B'
+        return textB, "B"
 
     return None, None
 
@@ -53,7 +51,7 @@ def _check_overlap_silence(past_line, next_line, thresh=1):
     past_text, past_start, past_end = _read_transcript_line(past_line)
     next_text, next_start, next_end = _read_transcript_line(next_line)
 
-    if past_text != '[silence]' or next_text != '[silence]':
+    if past_text != "[silence]" or next_text != "[silence]":
         return False
 
     if past_end - past_start < 1:
@@ -66,6 +64,7 @@ def _check_overlap_silence(past_line, next_line, thresh=1):
 
 
 # Preprocessing handled by TurnGPT (https://github.com/ErikEkstedt/datasets_turntaking/blob/main/datasets_turntaking/dataset/switchboard/utils.py)
+
 
 def sub_regex(s):
     """
@@ -141,7 +140,6 @@ def extract_speaker_timings(transcript, min_word_diff=0.05):
                     end = word["end"]
 
             out[speaker].append((start, end))
-    # print_transcript_timing(transcript, out)
     return out
 
 
@@ -158,14 +156,10 @@ def extract_dialog(filenames):
     trans_filenameA, words_filenameA, trans_filenameB, words_filenameB = filenames
 
     utterancesA = _extract_utterance_word_feats(
-        trans_filenameA,
-        words_filenameA,
-        speaker='A'
+        trans_filenameA, words_filenameA, speaker="A"
     )
     utterancesB = _extract_utterance_word_feats(
-        trans_filenameB,
-        words_filenameB,
-        speaker='B'
+        trans_filenameB, words_filenameB, speaker="B"
     )
 
     return [utterancesA, utterancesB]
@@ -194,11 +188,13 @@ def _extract_word_features(filename, speaker):
                     }
                 )
             else:
-                word_feats[key] = [{
-                    "word": word,
-                    "start": float(start),
-                    "end": float(end),
-                }]
+                word_feats[key] = [
+                    {
+                        "word": word,
+                        "start": float(start),
+                        "end": float(end),
+                    }
+                ]
     return word_feats
 
 
@@ -242,27 +238,29 @@ def remove_words_from_dialog(dialog):
     new_dialog = [[], []]
     for speaker in [0, 1]:
         for utterance in dialog[speaker]:
-            new_dialog[speaker].append({
-                "text": utterance["text"],
-                "start": utterance["start"],
-                "end": utterance["end"]
-            })
+            new_dialog[speaker].append(
+                {
+                    "text": utterance["text"],
+                    "start": utterance["start"],
+                    "end": utterance["end"],
+                }
+            )
 
     return new_dialog
 
 
 """
-Only combines based on turns identified within the structure of the conversation and so based 
+Only combines based on turns identified within the structure of the conversation and so based
 on the start of an utterance without consideration of the word level
 """
 
 
-def combine_dialogue_without_timings(dialogue):
+def combine_dialogue_without_timings(dialogue, separated_by=0.5):
     combined = dialogue[0]
     combined.extend(dialogue[1])
-    combined.sort(key=lambda key: (key['start'], -key['end']))
+    combined.sort(key=lambda key: (key["start"], -key["end"]))
 
-    combined = join_utterance_separated_by(combined)
+    combined = join_utterance_separated_by(combined, separated_by=separated_by)
     return combined
 
 
@@ -272,10 +270,10 @@ def _pp_dialogue(dialogue):
     curr_speaker = None
 
     for idx in range(len(dialogue)):
-        if curr_speaker is None or curr_speaker != dialogue[idx]['speaker']:
-            curr_speaker = dialogue[idx]['speaker']
+        if curr_speaker is None or curr_speaker != dialogue[idx]["speaker"]:
+            curr_speaker = dialogue[idx]["speaker"]
             out += f": {start} - {dialogue[idx-1]['end']}"
-            start = dialogue[idx]['start']
+            start = dialogue[idx]["start"]
             out += f"\n{curr_speaker}"
         out += f" {dialogue[idx]['text']}"
 
@@ -300,29 +298,31 @@ def join_utterance_separated_by(dialogs, separated_by=0.5):
     drefined = []
 
     lasts = [None for _ in range(2)]
-    dic = {'A': 0, 'B': 1}
-    for idx, curr in enumerate(dialogs):
+    dic = {"A": 0, "B": 1}
+    for _, curr in enumerate(dialogs):
         # If current text is entriely contained within the last utterance
-        # from the same speaker
-        last_current = lasts[dic[curr['speaker']]]
+        last_current = lasts[dic[curr["speaker"]]]
         if last_current is None:
-            lasts[dic[curr['speaker']]] = curr
+            lasts[dic[curr["speaker"]]] = curr
             continue
 
         # Join utterances from current speaker < separated_by
-        if last_current is not None and curr['start'] - last_current['end'] < separated_by:
-            last_current['text'] += f" {curr['text']}"
-            last_current['end'] = curr['end']
-            last_current['wfeats'].extend(curr['wfeats'])
+        if (
+            last_current is not None
+            and curr["start"] - last_current["end"] < separated_by
+        ):
+            last_current["text"] += f" {curr['text']}"
+            last_current["end"] = curr["end"]
+            last_current["wfeats"].extend(curr["wfeats"])
 
         else:
             drefined.append(last_current)
-            lasts[dic[curr['speaker']]] = curr
+            lasts[dic[curr["speaker"]]] = curr
 
     drefined.append(lasts[0])
     drefined.append(lasts[1])
 
-    drefined.sort(key=lambda x: (x['start'], -x['end']))
+    drefined.sort(key=lambda x: (x["start"], -x["end"]))
     return drefined
 
 
@@ -331,66 +331,127 @@ def pairwise_remove_overlaps(dialogs, speakers=2):
     overlaps = []
 
     lasts = [None for _ in range(speakers)]
-    dic = {'A': 0, 'B': 1}
+    dic = {"A": 0, "B": 1}
     for idx, curr in enumerate(dialogs):
         # If current text is entriely contained within the last utterance
-        last = lasts[not dic[curr['speaker']]]
-        last_current = lasts[dic[curr['speaker']]]
+        last = lasts[not dic[curr["speaker"]]]
+        last_current = lasts[dic[curr["speaker"]]]
 
         if last is not None and last["start"] <= curr["start"] <= last["end"]:
             if last["start"] <= curr["end"] <= last["end"]:
                 overlaps.append(curr)
                 continue
 
-        lasts[dic[curr['speaker']]] = curr
+        lasts[dic[curr["speaker"]]] = curr
         drefined.append(curr)
     return drefined, overlaps
 
 
 def remove_backchannels(dialogs, pre_silence=1, post_silence=1, bc_duration=1):
     new_dialog, _ = pairwise_remove_backchannels(
-        dialogs, pre_silence, post_silence, bc_duration)
+        dialogs, pre_silence, post_silence, bc_duration
+    )
     return new_dialog
 
 
 def pairwise_remove_backchannels(dialogs, pre_silence=1, post_silence=1, bc_duration=1):
-    dialogsA = [x for x in dialogs if x['speaker'] == 'A']
-    dialogsB = [x for x in dialogs if x['speaker'] == 'B']
+    dialogsA = [x for x in dialogs if x["speaker"] == "A"]
+    dialogsB = [x for x in dialogs if x["speaker"] == "B"]
 
-    assert len(dialogsA) + len(dialogsB) == len(dialogs), "Missing speaker tag"
+    assert (
+        len(dialogsA) + len(dialogsB) == len(dialogs)
+    ), f"dialogs not separated by speaker: {len(dialogsA)} + {len(dialogsB)} != {len(dialogs)}"
 
-    def remove_bc_from_channel(dialogs):
+    def remove_bc_from_channel(dialogs, end_of_utterance_time=0):
         last_end = 0
         new_dialog = []
         new_bc = []
         for idx, dialog in enumerate(dialogs):
-            bc_in = dialog['text'] in BACKCHANNELS
+            bc_in = dialog["text"] in BACKCHANNELS
 
-            # Pre silence is 1s, Post silence is 1s and Utterance Length is less than 1
-            duration = dialog['end'] - dialog['start']
-            pre_sil = dialog['start'] - last_end
+            # pre silence is 1s, post silence is 1s and utterance length is less than 1
+            duration = dialog["end"] - dialog["start"]
+            pre_sil = dialog["start"] - last_end
 
-            last_end = dialog['end']
+            last_end = dialog["end"]
 
-            post_sil = 0.1
+            post_sil = end_of_utterance_time - dialog["end"]
             if idx != len(dialogs) - 1:
-                post_sil = dialogs[idx+1]['start'] - dialog['end']
+                post_sil = dialogs[idx + 1]["start"] - dialog["end"]
 
-            if bc_in and duration < bc_duration and pre_sil > pre_silence and post_sil > post_silence:
+            if (
+                bc_in
+                and duration <= bc_duration
+                and pre_sil >= pre_silence
+                and post_sil >= post_silence
+            ):
                 new_bc.append(dialog)
                 continue
 
             new_dialog.append(dialog)
         return new_dialog, new_bc
 
-    new_dialogsA, new_bcA = remove_bc_from_channel(dialogsA)
-    new_dialogsB, new_bcB = remove_bc_from_channel(dialogsB)
+    end_of_utterance_time = max(dialogsA[-1]["end"], dialogsB[-1]["end"])
+    new_dialogsA, new_bcA = remove_bc_from_channel(
+        dialogsA, end_of_utterance_time)
+    new_dialogsB, new_bcB = remove_bc_from_channel(
+        dialogsB, end_of_utterance_time)
 
     new_dialogs = new_dialogsA + new_dialogsB
     new_bc = new_bcA + new_bcB
 
-    new_dialogs.sort(key=lambda key: (key['start'], -key['end']))
-    new_bc.sort(key=lambda key: (key['start'], -key['end']))
+    new_dialogs.sort(key=lambda key: (key["start"], -key["end"]))
+    new_bc.sort(key=lambda key: (key["start"], -key["end"]))
+
+    return new_dialogs, new_bc
+
+
+def insert_overlapped_bc(dialogs, backchannels):
+    """
+    Reinserts backchannels into the dialog if it was removed but the
+    utterance is completely contained within own speaker's utterance.
+    Occurs as the backchannel performs no overlap checking
+    """
+
+    def insert_bc_into_channel(dialogs, backchannels):
+        new_bc = []
+
+        for bc in backchannels:
+            new_bc.append(bc)
+            for dialog in dialogs:
+                if dialog["start"] <= bc["start"] <= dialog["end"]:
+                    new_bc.pop(-1)
+                    for idx, wfeat in enumerate(dialog["wfeats"][1:], start=1):
+                        prev_wfeat = dialog["wfeats"][idx - 1]
+                        if prev_wfeat["end"] <= bc["start"] <= wfeat["start"]:
+                            for bc_wfeat in bc["wfeats"][::-1]:
+                                dialog["wfeats"].insert(idx, bc_wfeat)
+                            break
+                    dialog["text"] = " ".join(
+                        [x["word"] for x in dialog["wfeats"]])
+                    break
+                if dialog["start"] > bc["start"]:
+                    break
+
+        return dialogs, new_bc
+
+    old_length_dialogs = len(dialogs)
+    old_length_bc = len(backchannels)
+
+    dialogsA = [x for x in dialogs if x["speaker"] == "A"]
+    dialogsB = [x for x in dialogs if x["speaker"] == "B"]
+
+    backchannelsA = [x for x in backchannels if x["speaker"] == "A"]
+    backchannelsB = [x for x in backchannels if x["speaker"] == "B"]
+
+    new_dialogsA, new_bcA = insert_bc_into_channel(dialogsA, backchannelsA)
+    new_dialogsB, new_bcB = insert_bc_into_channel(dialogsB, backchannelsB)
+
+    new_dialogs = new_dialogsA + new_dialogsB
+    new_dialogs.sort(key=lambda key: (key["start"], -key["end"]))
+
+    new_bc = new_bcA + new_bcB
+    new_bc.sort(key=lambda key: (key["start"], -key["end"]))
 
     return new_dialogs, new_bc
 
@@ -403,15 +464,26 @@ So this function just needs to return the turn list for a conversation
 """
 
 
-def combine_consecutive_trps(dialogs):
-    combined_dialogs = [dialogs[0]]
-    for idx in range(1, len(dialogs)):
-        if combined_dialogs[-1]['speaker'] == dialogs[idx]['speaker']:
-            combined_dialogs[-1]['text'] += f" {dialogs[idx]['text']}"
-            combined_dialogs[-1]['end'] = dialogs[idx]['end']
-            combined_dialogs[-1]['wfeats'].extend(dialogs[idx]['wfeats'])
+def combine_consecutive_trps(dialogs, bc=[], overlap=[]):
+    temp_dialogs = [x | {"dialog_type": "dialog"} for x in dialogs]
+    temp_bc = [x | {"dialog_type": "bc"} for x in bc]
+    temp_overlaps = [x | {"dialog_type": "overlap"} for x in overlap]
+    temp_dialogs = temp_dialogs + temp_bc + temp_overlaps
+    temp_dialogs.sort(key=lambda key: (key["start"], -key["end"]))
+
+    combined_dialogs = [temp_dialogs[0]]
+    for idx in range(1, len(temp_dialogs)):
+        if (
+            combined_dialogs[-1]["speaker"] == temp_dialogs[idx]["speaker"]
+            and temp_dialogs[idx]["dialog_type"] == "dialog"
+            and combined_dialogs[-1]["dialog_type"] == "dialog"
+        ):
+            combined_dialogs[-1]["text"] += f" {temp_dialogs[idx]['text']}"
+            combined_dialogs[-1]["end"] = temp_dialogs[idx]["end"]
+            combined_dialogs[-1]["wfeats"].extend(temp_dialogs[idx]["wfeats"])
+            combined_dialogs[-1]["dialog_type"] = "dialog"
         else:
-            combined_dialogs.append(dialogs[idx])
+            combined_dialogs.append(temp_dialogs[idx])
     return combined_dialogs
 
 
@@ -420,9 +492,9 @@ def extract_word_features(dialog):
     utterancesB = []
 
     for d in dialog[0]:
-        utterancesA.extend(d['wfeats'])
+        utterancesA.extend(d["wfeats"])
     for d in dialog[1]:
-        utterancesB.extend(d['wfeats'])
+        utterancesB.extend(d["wfeats"])
 
     return [utterancesA, utterancesB]
 
@@ -431,14 +503,10 @@ def pairwise_extract_dialog(filenames):
     trans_filenameA, words_filenameA, trans_filenameB, words_filenameB = filenames
 
     utterancesA = _pairwise_extract_utterance_word_feats(
-        trans_filenameA,
-        words_filenameA,
-        speaker='A'
+        trans_filenameA, words_filenameA, speaker="A"
     )
     utterancesB = _pairwise_extract_utterance_word_feats(
-        trans_filenameB,
-        words_filenameB,
-        speaker='B'
+        trans_filenameB, words_filenameB, speaker="B"
     )
 
     return [utterancesA, utterancesB]
@@ -470,78 +538,18 @@ def _pairwise_extract_utterance_word_feats(trans_file, word_file, speaker):
     return utterance
 
 
-def separate_by_speaker(dialog, dual_dialog=None, conv_id=0):
+def separate_by_speaker(dialog, conv_id=0):
     speakerA = []
     speakerB = []
 
-    word_countA = 0
-    word_countB = 0
-
     for idx, utterance in enumerate(dialog):
-        dialog[idx]['conv_id'] = conv_id
-        if utterance['speaker'] == 'A':
+        dialog[idx]["conv_id"] = conv_id
+        if utterance["speaker"] == "A":
             speakerA.append(utterance)
 
-            # Processing backchannels or overlaps
-            if dual_dialog is None:
-                continue
-
-            # Ensure processing is equal for pairwise and ordinary words
-            word_countA += len(utterance['wfeats'])
-        elif utterance['speaker'] == 'B':
+        elif utterance["speaker"] == "B":
             speakerB.append(utterance)
-
-            # Processing backchannels or overlaps
-            if dual_dialog is None:
-                continue
-
-            word_countB += len(utterance['wfeats'])
         else:
             raise Exception(f"No label for: {utterance['speaker']}")
 
-    return {'speakerA': speakerA, 'speakerB': speakerB}
-
-
-def remove_backchannels2(dialogs):
-    last_endA = 0
-    last_endB = 0
-
-    backchannelA = None
-    backchannelB = None
-
-    output = []
-
-    for idx in range(len(dialogs)):
-        if dialogs[idx]['speaker'] == 'A':
-            if backchannelA is not None:
-                if not _remove_backchannel(backchannelA, dialogs[idx]):
-                    output.append(backchannelA)
-
-            backchannelA = _potential_backchannel(last_endA, dialogs[idx])
-            if backchannelA is None:
-                output.append(dialogs[idx])
-            last_endA = dialogs[idx]['end']
-        else:
-            if backchannelB is not None:
-                if not _remove_backchannel(backchannelB, dialogs[idx]):
-                    output.append(backchannelB)
-
-            backchannelB = _potential_backchannel(last_endB, dialogs[idx])
-            if backchannelB is None:
-                output.append(dialogs[idx])
-            last_endB = dialogs[idx]['end']
-
-    # _pp_dialogue(dialogs)
-    # _pp_dialogue(output)
-    return output
-
-
-def _remove_backchannel(backchannelA, dialog):
-    return (dialog['start'] - backchannelA['end']) > 1
-
-
-def _potential_backchannel(last_phrase, current_phrase):
-    if (current_phrase['start'] - last_phrase) > 1 and current_phrase['text'] in BACKCHANNELS:
-        return current_phrase
-
-    return None
+    return {"speakerA": speakerA, "speakerB": speakerB}

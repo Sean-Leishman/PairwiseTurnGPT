@@ -243,7 +243,7 @@ class Perplexity_Score(Metric):
             maskB, labelsB, torch.tensor(-100, device="cuda:0"))
         self.perplexity.update(predsA, predsB, labelsA, labelsB)
 
-    def calculate(self, params=None):
+    def calculate(self, params=None, *args, **kwargs):
         self.output = self.perplexity.compute()
         return self.output.item(), None, None
 
@@ -272,7 +272,7 @@ class ACC(Metric):
         self.metric = Accuracy(
             task='multiclass', thresholds=self.thresholds).to(self.device)
 
-    def calculate(self, params=None):
+    def calculate(self, params=None, *args,  **kwargs):
         self.output = self.metric.compute()
         self.max_output = self.output
         return self.max_output.item(), None, None
@@ -331,7 +331,7 @@ class BACC(Metric):
             token_id = torch.Tensor(token_id).long().to(self.device)
         self.tokens = token_id
 
-    def calculate(self, params=None, prefix=""):
+    def calculate(self, params=None, prefix="", *args,  **kwargs):
         recall = torch.div(self.tp, self.tp + self.fn, out=torch.zeros_like(
             self.tp, dtype=float), rounding_mode=None)
         specificity = torch.div(self.tn, self.tn + self.fp, out=torch.zeros_like(
@@ -344,7 +344,7 @@ class BACC(Metric):
         thresh = self.thresholds[idx].item()
         count = self.tp[idx] + self.fp[idx] + self.fn[idx] + self.tn[idx]
 
-        if prefix[-1] != "_":
+        if len(prefix) > 0 and prefix[-1] != "_":
             prefix += "_"
 
         for i in range(len(self.thresholds)):
@@ -561,7 +561,7 @@ class ROC_AUC(Metric):
             task='multiclass', thresholds=self.thresholds, num_classes=1).to(self.device)
         self.auc = AUC()
 
-    def calculate(self, params=None):
+    def calculate(self, params=None, *args,   **kwargs):
         fpr, tpr, thresholds = self.metric.compute()
 
         sort_indices = torch.argsort(fpr, descending=True)
@@ -693,7 +693,7 @@ class F1_Score(Metric):
 
         self.rule = rule
 
-    def calculate(self, params=None):
+    def calculate(self, params=None, *args,   **kwargs):
         self.output = self.metric.compute()
         self.max_output = self.output
         return self.max_output.item(), None, None
@@ -792,7 +792,7 @@ class PR_AUC(Metric):
 
         self.rule = rule
 
-    def calculate(self, params=None):
+    def calculate(self, params=None, *args,   **kwargs):
         precision, recall, thresholds = self.metric.compute()
 
         sort_indices = torch.argsort(recall, descending=False)
@@ -1000,7 +1000,7 @@ class BargeRate(Metric):
             self.non_barge_in[idx] += sum(x < threshold for x in max_probs)
         self.total_turns += len(max_probs)
 
-    def calculate(self, params=None):
+    def calculate(self, params=None, *args,   **kwargs):
         if params is None:
             params = {}
 
@@ -1112,7 +1112,7 @@ class NRR(Metric):
 
         return
 
-    def calculate(self, params=None):
+    def calculate(self, params=None, *args,   **kwargs):
         if params is None:
             params = {}
 
@@ -1239,9 +1239,14 @@ class Metrics:
                                  overlap_maskA=overlap_maskA,
                                  overlap_maskB=overlap_maskB)
 
-    def calculate(self, params=None, **kwargs):
+    def calculate(self, params=None, prefix="", *args,   **kwargs):
         for metric in self.metrics:
-            output, count, thresh = metric.calculate(params, **kwargs)
+            if len(prefix) > 0:
+                output, count, thresh = metric.calculate(
+                    params, prefix, **kwargs)
+            else:
+                output, count, thresh = metric.calculate(params, **kwargs)
+
             self.output[self.type+str(metric)] = output
             self.counts[self.type+str(metric)] = count
             self.params[self.type+str(metric)] = thresh
