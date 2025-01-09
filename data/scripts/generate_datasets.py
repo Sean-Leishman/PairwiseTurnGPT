@@ -9,7 +9,7 @@ for split_utt in [True, False]:
         spoken_dm = SpokenDM(
             datasets=dataset,
             process="serialised",
-            end_on="turn-end",
+            serialised="turn-end",
             combine_speaker=combine_speaker,
         )
 

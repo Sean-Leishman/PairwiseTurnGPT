@@ -10,15 +10,14 @@ import threading
 import pickle
 import json
 
-from switchboard import SwitchboardDataset
-from fisher import FisherDataset
-from edacc import EdAccDataset
-from data.utils import get_abs_path, pp_pair_dialogs
-from future_context_process import FutureContextProcess
+from data.switchboard import SwitchboardDataset
+from data.fisher import FisherDataset
+from data.edacc import EdAccDataset
+from data.utils import get_abs_path
 from aligned_process import AlignedProcess
 from serialised_process import SerialisedProcess, to_serialised_process_type
 from base import DialogDMInterface, Datasets, TurnID, Turn
-from utils import get_logger
+from utils import get_logger, str_pair_dialogs
 from data.tokenizer import SpokenDialogTokenizer
 from huggingface_hub import snapshot_download
 
@@ -130,13 +129,6 @@ def BuildProcess(
             *args,
             **kwargs,
         )
-    elif method == "future":
-        return FutureContextProcess(
-            tokenizer,
-            split_utt=split_utt,
-            *args,
-            **kwargs,
-        )
 
     raise ValueError(f"No process specified: {args} {kwargs}")
 
@@ -175,7 +167,7 @@ class SpokenDM(DialogDMInterface):
         tokenizer=None,
         device="cuda:0",
         save_data=True,
-        load_from_hub=False,
+        load_from_hub=True,
         load_from_cache=False,
         max_length=256,
         keep_length=64,
@@ -630,16 +622,22 @@ class SpokenDM(DialogDMInterface):
 
         return False
 
-    def show_input(self, batch=None, conv_id=None):
-        for item in self.show_input_iterator(batch=batch, conv_id=conv_id):
+    def show_input(self, batch=None, conv_id=None, save_to=None):
+        for item in self.show_input_iterator(
+            batch=batch, conv_id=conv_id, save_to=save_to
+        ):
             if item is None:
                 break
 
             continue
 
-    def show_input_iterator(self, batch=None, conv_id=None):
+    def show_input_iterator(self, batch=None, conv_id=None, save_to=None):
         if batch is None and conv_id is None:
             raise ValueError("Either batch or conv_id must be provided")
+
+        if save_to is not None:
+            with open(save_to, "w") as f:
+                f.write("")
 
         if batch is None:
             batch = [x for x in self.data if conv_id in x["speakerA"]["conv_id"]]
@@ -732,7 +730,8 @@ class SpokenDM(DialogDMInterface):
             othersB["turn_end_types"] = otherB
             othersB["speaker_ids"] = speaker_idsB
 
-            _, columns, _ = pp_pair_dialogs(
+            outA, _, columns, _ = str_pair_dialogs(
+                "",
                 self.tokenizer,
                 input_idsA,
                 timings=timingsA,
@@ -742,7 +741,8 @@ class SpokenDM(DialogDMInterface):
                 others=othersA,
                 width=os.get_terminal_size().columns,
             )
-            start, _, _ = pp_pair_dialogs(
+            outB, start, _, _ = str_pair_dialogs(
+                "",
                 self.tokenizer,
                 input_idsB,
                 timings=timingsB,
@@ -753,7 +753,19 @@ class SpokenDM(DialogDMInterface):
                 columns=columns,
                 width=os.get_terminal_size().columns,
             )
+
+            print(outA)
+            print(outB)
+            if save_to is not None:
+                with open(save_to, "a") as f:
+                    f.write(outA)
+                    f.write("\n")
+                    f.write(outB)
+                    f.write("\n")
             print()
+            if save_to is not None:
+                with open(save_to, "a") as f:
+                    f.write("\n")
 
             if start >= end:
                 break
@@ -761,6 +773,9 @@ class SpokenDM(DialogDMInterface):
             yield start
 
         print("------------------------------------")
+        if save_to is not None:
+            with open(save_to, "a") as f:
+                f.write("------------------------------------\n")
 
 
 if __name__ == "__main__":
@@ -781,18 +796,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--process",
-        choices=["serialised", "aligned", "future"],
-        default=None,
-        help="The process used to generate data. `serialised' processes the data in a serialised manner for use with turngpt. `aligned' processes the data in an aligned manner for use with pairwisegpt. `future' processes the data with future context for futture work",
+        choices=["serialised", "aligned"],
+        default="aligned",
+        help="The process used to generate data. `serialised' processes the data in a serialised manner for use with turngpt. `aligned' processes the data in an aligned manner for use with pairwisegpt.",
     )
 
-    future_group = parser.add_argument_group("future")
-    future_group.add_argument(
-        "--summarize-method",
-        choices=["NONE", "HF_PROMPT"],
-        default="none",
-        help="The summarization method used to generate data for `future'. `NONE' does not use any summarization. `HF_PROMPT' uses the HuggingFace prompt-based summarization method",
-    )
     serialised_group = parser.add_argument_group("serialised")
     serialised_group.add_argument(
         "--serialised",
@@ -901,7 +909,6 @@ if __name__ == "__main__":
         keep_length=args.keep_length,
         overlap_length=args.overlap_length,
         method=args.process,
-        summarization_method=args.summarize_method,
         end_of_utterance_tokens=(
             ["<ebc>", "<eint>", "<yield>"]
             if args.include_yield_token
@@ -922,11 +929,18 @@ if __name__ == "__main__":
 
             if input_string == "c":
                 conv_id = input("Enter conversation ID: ")
-                gd.show_input(conv_id=conv_id)
+                gd.show_input(
+                    conv_id=conv_id, save_to=get_abs_path(f"examples/{conv_id}.txt")
+                )
             elif input_string == "q":
                 break
             else:
-                gd.show_input(gd[i])
+                gd.show_input(
+                    gd[i],
+                    save_to=get_abs_path(
+                        f"examples/{gd[i]["speakerA"]["conv_id"]}.txt"
+                    ),
+                )
                 i += 1
 
     else:

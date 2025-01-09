@@ -909,13 +909,11 @@ class SerialisedProcess(Process):
                     break
 
                 temp = {}
-                import pprint
-
-                pprint.pp(conv.keys())
                 for speaker, value in conv.items():
+                    if "speaker" not in speaker:
+                        continue
+
                     temp[speaker] = {}
-                    print("VALUE")
-                    pprint.pp(value)
                     for key, val in value.items():
                         if isinstance(val, torch.Tensor):
                             temp[speaker][key] = val[start_idx:end_idx].clone()
@@ -924,6 +922,7 @@ class SerialisedProcess(Process):
                         else:
                             temp[speaker][key] = val
 
+                temp["turns"] = conv["turns"]
                 result.append(copy.deepcopy(temp))
 
                 if end_idx == len(conv["speakerA"]["input_ids"]):
