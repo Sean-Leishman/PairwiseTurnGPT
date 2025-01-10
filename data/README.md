@@ -1,6 +1,8 @@
 # Dataset Managers
 For enviorment setup, please refer to the [main README](../README.md).
 
+> Note that `pairwise_generation_dm.py` contains the original code for the paper so, `dialog_dm.py` and `spoken_dm.py` were produced for QoL changes and contains the same daat preprocessing required
+
 Contains the dataset managers for the various datasets used in this project.
 The `dialog_dm.py` contains the main dataset manager for all of the datasets which includes written and spontaneous dialog datasets.
 
