@@ -30,10 +30,10 @@ conda install pytorch torchvision torchaudio cpuonly -c pytorch
 conda install --file package_list.txt
 pip install -r requirements.txt
 ```
+
+```
 cd data && pip install -e .
-```
-```
-pip install -e .
+cd .. && pip install -e .
 ```
 
 ## File Structure
