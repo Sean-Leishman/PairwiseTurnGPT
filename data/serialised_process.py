@@ -27,6 +27,8 @@ def to_serialised_process_type(value):
         return SerialisedProcessType.TurnStart
     elif isinstance(value, SerialisedProcessType):
         return value
+    elif isinstance(value, int):
+        return SerialisedProcessType(value)
 
     raise ValueError(f"SerialisedProcessType {value} not implemented")
 
@@ -60,8 +62,7 @@ class SerialisedProcess(Process):
         tokenizer,
         end_on=SerialisedProcessType.TurnEnd,
         combine_speaker=False,
-        remove_emp_tokens=False,
-        remove_special_tokens=False,
+        filter_special_tokens=[],
         no_overlap=False,
         split_utt=True,
         max_length=256,
@@ -80,7 +81,7 @@ class SerialisedProcess(Process):
             tokenizer (Tokenizer): Tokenizer to use for processing the data
             end_on (SerialisedProcessType, optional): Type of serialisation to use. Defaults to SerialisedProcessType.TurnEnd.
             combine_speaker (bool, optional): Whether to serialise the conversation into a single stream. Defaults to False.
-            remove_emp_tokens (bool, optional): Whether to remove <emp> tokens from the conversation. Defaults to False.
+            filter_special_tokens (list, optional): List of special tokens to filter out. Defaults to [].
             no_overlap (bool, optional): Whether to not allow lexical and turn-end token to stack. Defaults to False.
         """
         super().__init__(tokenizer)
@@ -89,12 +90,11 @@ class SerialisedProcess(Process):
 
         self.end_on = end_on if end_on is not None else SerialisedProcessType.TurnEnd
         self.combine_speaker = combine_speaker
-        self.remove_emp_tokens = remove_emp_tokens
-        self.remove_special_tokens = remove_special_tokens
+        self.filter_special_tokens = filter_special_tokens
         self.no_overlap = no_overlap
         self.split_utt = split_utt
         assert not (
-            self.combine_speaker and self.remove_emp_tokens
+            self.combine_speaker and "<emp>" in filter_special_tokens
         ), "Combine speaker and remove emp tokens must not be used together"
 
         self.max_length = max_length
@@ -132,7 +132,7 @@ class SerialisedProcess(Process):
             (
                 self.end_on,
                 self.combine_speaker,
-                self.remove_emp_tokens,
+                ",".join(self.filter_special_tokens),
                 self.max_length,
                 self.keep_length,
                 self.overlap_length,
@@ -142,19 +142,19 @@ class SerialisedProcess(Process):
     def __str__(self):
         end_on = f"end_on={self.end_on}"
         combine_speaker = f"combine_speaker={int(self.combine_speaker)}"
-        remove_emp_tokens = f"remove_emp_tokens={int(self.remove_emp_tokens)}"
+        filter_special_tokens = f"filter_special_tokens={self.filter_special_tokens}"
 
         max_length = f"max_length={self.max_length}"
         keep_length = f"keep_length={self.keep_length}"
         overlap_length = f"overlap_length={self.overlap_length}"
-        return f"SerialisedProcess({end_on},{combine_speaker},{remove_emp_tokens},{max_length},{keep_length},{overlap_length})"
+        return f"SerialisedProcess({end_on},{combine_speaker},{filter_special_tokens},{max_length},{keep_length},{overlap_length})"
 
     def config_to_dict(self):
         return {
             "process": "SerialisedProcess",
             "end_on": self.end_on,
             "combine_speaker": self.combine_speaker,
-            "remove_emp_tokens": self.remove_emp_tokens,
+            "filter_special_tokens": self.filter_special_tokens,
             "max_length": self.max_length,
             "keep_length": self.keep_length,
             "overlap_length": self.overlap_length,
@@ -174,21 +174,21 @@ class SerialisedProcess(Process):
     def process_conversation(self, ds):
         for conv in self.aligned_processor.process_conversation(ds):
             for serialised_turn in self._process(conv):
-                if self.remove_special_tokens:
+                if len(self.filter_special_tokens) > 0:
                     serialised_turn["speakerA"] = self._remove_special_tokens(
-                        serialised_turn["speakerA"]
+                        serialised_turn["speakerA"], self.filter_special_tokens
                     )
                     if "speakerB" in serialised_turn:
                         serialised_turn["speakerB"] = self._remove_special_tokens(
-                            serialised_turn["speakerB"]
+                            serialised_turn["speakerB"], self.filter_special_tokens
                         )
 
                 for split_utt in self._split_utterances([serialised_turn]):
                     yield split_utt
 
-    def _remove_special_tokens(self, data):
+    def _remove_special_tokens(self, data, remove_tokens):
         special_tokens = torch.tensor(
-            self.tokenizer.convert_tokens_to_ids(self.tokenizer.special_tokens)
+            self.tokenizer.convert_tokens_to_ids(remove_tokens)
             + [self.tokenizer.eos_token_id]
         )
         index = torch.logical_not(torch.isin(data["input_ids"], special_tokens))
@@ -263,7 +263,7 @@ class SerialisedProcess(Process):
             )
             output.pop("speakerB")
 
-        if self.remove_emp_tokens:
+        if "<emp>" in self.filter_special_tokens:
             output["speakerA"] = self._remove_all_emp_tokens(output["speakerA"])
             if "speakerB" in output:
                 output["speakerB"] = self._remove_all_emp_tokens(output["speakerB"])

@@ -14,6 +14,7 @@ from pairwise_generation_dm import TurnType
 
 logger = logging.getLogger(__name__)
 
+
 class MetricType(IntEnum):
     BACC = 0
     PR_AUC = 1
@@ -737,7 +738,7 @@ class BargeRate(Metric):
             idx = 2
 
         barge_in = self.barge_in[idx] / \
-                   (self.non_barge_in[idx] + self.barge_in[idx])
+            (self.non_barge_in[idx] + self.barge_in[idx])
 
         for thresh in self.thresholds:
             i = self.thresholds.tolist().index(thresh)
@@ -875,12 +876,8 @@ class NRR(Metric):
         else:
             idx = 2
 
-        print(thresh)
-        print(self.thresholds.tolist())
-        print(idx)
-
         nrr = self.no_response_turns[idx] / \
-              (self.response_turns[idx] + self.no_response_turns[idx])
+            (self.response_turns[idx] + self.no_response_turns[idx])
 
         for thresh in self.thresholds:
             i = self.thresholds.tolist().index(thresh)

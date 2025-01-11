@@ -4,7 +4,6 @@ import pprint
 
 from data.tokenizer import SpokenDialogTokenizer
 
-from conversational_dm import ConversationalDM
 from spoken_dm import SpokenDM
 from base import Datasets, DialogDMInterface
 from data.utils import retokenize, get_logger
@@ -15,15 +14,7 @@ from torch.utils.data import DataLoader, ConcatDataset
 datasets.disable_caching()
 logger = get_logger(__name__)
 
-CONVERSATIONAL_DATASETS = [
-    Datasets.CURIOSITY_DIALOG,
-    Datasets.DAILY_DIALOG,
-    Datasets.METAWOZ,
-    Datasets.MULTIWOZ,
-    Datasets.TASKMASTER1,
-    Datasets.TASKMASTER2,
-    Datasets.TASKMASTER3,
-]
+CONVERSATIONAL_DATASETS = []
 
 PAIRWISE_GENERATION_DATASETS = [Datasets.SWITCHBOARD, Datasets.FISHER, Datasets.EDACC]
 
@@ -31,13 +22,6 @@ MAP_STRING_TO_DATASET = {
     "switchboard": Datasets.SWITCHBOARD,
     "fisher": Datasets.FISHER,
     "edacc": Datasets.EDACC,
-    "curiosity_dialog": Datasets.CURIOSITY_DIALOG,
-    "daily_dialog": Datasets.DAILY_DIALOG,
-    "metawoz": Datasets.METAWOZ,
-    "multiwoz": Datasets.MULTIWOZ,
-    "taskmaster1": Datasets.TASKMASTER1,
-    "taskmaster2": Datasets.TASKMASTER2,
-    "taskmaster3": Datasets.TASKMASTER3,
 }
 
 

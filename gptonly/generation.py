@@ -40,7 +40,8 @@ def topp_sampling(
 
     # the cumulative probability distribution may not be of the same size
     # so we must sample for the batches individually
-    next_token = torch.zeros((probs.shape[0]), dtype=torch.long, device=logits.device)
+    next_token = torch.zeros(
+        (probs.shape[0]), dtype=torch.long, device=logits.device)
     next_prob = torch.zeros((probs.shape[0]), device=logits.device)
     for n_batch in range(probs.shape[0]):
         eq = p_batch == n_batch
@@ -106,7 +107,8 @@ def generate_greedy(
 ):
     """Generate by sampling"""
     # prepare input for model
-    batch = model.tokenizer(context, include_end_ts=include_end_ts, return_tensors="pt")
+    batch = model.tokenizer(
+        context, include_end_ts=include_end_ts, return_tensors="pt")
     batch["attention_mask"] = None
 
     if max_input_length is not None:
@@ -185,18 +187,19 @@ def generate_sample(
     """Generate by sampling"""
 
     # prepare input for model
-    batch = model.tokenizer(context, include_end_ts=include_end_ts, return_tensors="pt")
+    batch = model.tokenizer(
+        context, include_end_ts=include_end_ts, return_tensors="pt")
     batch["attention_mask"] = None
 
     if max_input_length is not None:
         batch["input_ids"] = batch["input_ids"][:, -max_input_length:]
-        batch["token_type_ids"] = batch["token_type_ids"][:, -max_input_length:]
+        batch["token_type_ids"] = batch["speaker_ids"][:, -max_input_length:]
 
     # sample multiple trajectories at once
     batch = expand_batch(batch, n_trajectories)
 
     next_speaker = None  # avoid lint errors (most)
-    if model.include_speaker_tokens:
+    if not model.include_speaker_tokens:
         batch["token_type_ids"] = None
 
     # keep track of everything
@@ -219,7 +222,8 @@ def generate_sample(
 
     n = 0  # counter
     while n <= n_steps:
-        out = model(**batch, use_cache=True)
+        out = model(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"],
+                    token_type_ids=batch["token_type_ids"], use_cache=True)
 
         if n == 0:
             out["probs"] = out["logits"].softmax(dim=-1)
@@ -261,7 +265,8 @@ def generate_sample(
             completed["input_ids"].append(generated["input_ids"][done])
             completed["probs"].append(generated["probs"][done])
             if model.include_speaker_tokens:
-                completed["token_type_ids"].append(generated["token_type_ids"][done])
+                completed["token_type_ids"].append(
+                    generated["token_type_ids"][done])
 
             if keep.nelement() == 0:  # We have completed the sampling of all batches
                 generated["input_ids"] = []
@@ -314,12 +319,14 @@ def generate_sample(
             for _inp in inp:
                 tokens.append(model.tokenizer.decode(_inp))
             diff = max_len - inp.shape[-1]
-            fill = torch.ones((inp.shape[0], diff), device=device, dtype=torch.long)
+            fill = torch.ones((inp.shape[0], diff),
+                              device=device, dtype=torch.long)
             if diff > 0:
                 # fill with -1 to indicate that we don't have any words
                 new_inp.append(torch.cat((inp, fill * -1), dim=-1))
                 new_sp.append(
-                    torch.cat((completed["token_type_ids"][i], fill * -1), dim=-1)
+                    torch.cat((completed["token_type_ids"]
+                              [i], fill * -1), dim=-1)
                 )
                 # fill with 1 to make prob calculations correct
                 new_probs.append(
@@ -333,7 +340,8 @@ def generate_sample(
         completed["input_ids"] = torch.cat(new_inp)
         completed["token_type_ids"] = torch.cat(new_sp)
         completed["probs"] = torch.cat(new_probs)
-        completed["most_likely"] = completed["probs"].log().sum(dim=-1).argmax()
+        completed["most_likely"] = completed["probs"].log().sum(dim=-
+                                                                1).argmax()
         completed["tokens"] = tokens
     else:
         completed["input_ids"] = torch.cat(completed["input_ids"])
@@ -479,7 +487,7 @@ if __name__ == "__main__":
         model = model.to("cuda")
 
     while True:
-        #context = [input("Context: ")]
+        # context = [input("Context: ")]
         context = ["Hello my name is"]
         sampled = generate(
             model,

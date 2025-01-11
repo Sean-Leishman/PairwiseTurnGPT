@@ -17,7 +17,7 @@ from data.utils import get_abs_path
 from aligned_process import AlignedProcess
 from serialised_process import SerialisedProcess, to_serialised_process_type
 from base import DialogDMInterface, Datasets, TurnID, Turn
-from utils import get_logger, str_pair_dialogs
+from data.utils import get_logger, str_pair_dialogs
 from data.tokenizer import SpokenDialogTokenizer
 from huggingface_hub import snapshot_download
 

@@ -18,7 +18,7 @@ from tokenizers.normalizers import (
     Sequence,
 )
 
-from gptonly.tokenizer import SpokenDialogTokenizer
+from pairwisegpt.tokenizer import SpokenDialogTokenizer
 
 
 class GPT(torch.nn.Module):
@@ -37,6 +37,7 @@ class GPT(torch.nn.Module):
                  individual_speaker_tokens=False,
                  include_speaker_embeddings=False,
                  device="cuda:0",
+                 tokens=["<speakerA>", "<speakerB>", "<emp>"],
                  **kwargs,
                  ):
         super(GPT, self).__init__()
@@ -75,7 +76,6 @@ class GPT(torch.nn.Module):
         self.individual_speaker_tokens = individual_speaker_tokens
         self.include_speaker_tokens = include_speaker_embeddings
 
-        tokens = ['<speakerA>', '<speakerB>', '<emp>']
         if not self.individual_speaker_tokens:
             tokens = ['<emp>']
 
@@ -106,7 +106,8 @@ class GPT(torch.nn.Module):
             token_id = self.tokenizer.convert_tokens_to_ids(token)
             weight[token_id] = self.weight_eos_token
         weight[self.tokenizer.eos_token_id] = self.weight_eos_token
-        weight[self.tokenizer.convert_tokens_to_ids('<emp>')] = self.weight_regular_token
+        weight[self.tokenizer.convert_tokens_to_ids(
+            '<emp>')] = self.weight_regular_token
 
         return weight.to(self.device)
 
@@ -212,18 +213,30 @@ class GPT(torch.nn.Module):
 
             return loss, count
 
-    def generate(self, input_ids=None, speaker_ids=None, mask=None, output_scores=False, n_sequences=1, stop_at_eos=False):
+    def generate(self,
+                 input_ids=None,
+                 speaker_ids=None,
+                 mask=None,
+                 output_scores=False,
+                 suppress_tokens=None,
+                 **kwargs):
+        print(f"SUPPRESS TOKENS: {suppress_tokens}")
         if input_ids is None:
             sample_output = self.gpt.generate(
                 bos_token_id=random.randint(1, 30000),
                 token_type_ids=speaker_ids,
                 do_sample=True,
                 top_k=50,
-                max_length=100,
                 top_p=0.95,
-                stop_at_eos=stop_at_eos,
-                num_return_sequences=n_sequences,
-                pad_token_id=self.tokenizer.pad_token_id
+                num_return_sequences=kwargs.get('n_sequences', 1),
+                pad_token_id=self.tokenizer.pad_token_id,
+                eos_token_id=self.tokenizer.eos_token_id,
+                output_scores=output_scores,
+                return_dict_in_generate=True,
+                max_length=kwargs.get('max_length', 100),
+                min_length=kwargs.get('min_length', 10),
+                num_beams=kwargs.get('num_beams', 1),
+                suppress_tokens=suppress_tokens,
             )
         else:
             sample_output = self.gpt.generate(
@@ -232,13 +245,16 @@ class GPT(torch.nn.Module):
                 attention_mask=mask,
                 do_sample=True,
                 top_k=50,
-                max_length=300,
                 top_p=0.95,
-                num_return_sequences=n_sequences,
+                num_return_sequences=kwargs.get('n_sequences', 1),
                 pad_token_id=self.tokenizer.pad_token_id,
                 eos_token_id=self.tokenizer.eos_token_id,
-                output_scores=True,
+                output_scores=output_scores,
                 return_dict_in_generate=True,
+                max_length=kwargs.get('max_length', 100),
+                min_length=kwargs.get('min_length', 10),
+                num_beams=kwargs.get('num_beams', 1),
+                suppress_tokens=suppress_tokens,
             )
         return sample_output
 

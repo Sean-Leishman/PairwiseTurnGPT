@@ -1,5 +1,3 @@
-# Adapted from TurnGPT
-
 from tokenizers import Regex
 from tokenizers.normalizers import (
     Lowercase,
@@ -10,10 +8,12 @@ from tokenizers.normalizers import (
     Sequence,
 )
 from transformers import AutoTokenizer
+from transformers.models.llama import LlamaTokenizerFast
 from transformers.tokenization_utils_base import BatchEncoding
 from typing import List, Union
 import torch
 import re
+import os
 
 import logging
 
@@ -22,8 +22,8 @@ logger = logging.getLogger(__name__)
 TS_TOKENS = {
     "eos_token": "<eot>",
     "pad_token": "<|endoftext|>",
-    "additional_special_tokens": ["<emp>",  "<sot>", "<sbc>", "<ebc>", "<sint>", "<eint>"],
-    # "additional_special_tokens": ["<emp>", "<eot>", "<ebc>", "<eint>"],
+    # "additional_special_tokens": ["<emp>",  "<sot>", "<sbc>", "<ebc>", "<sint>", "<eint>"],
+    "additional_special_tokens": ["<emp>", "<yield>", "<ebc>", "<eint>"],
 }
 
 
@@ -99,35 +99,61 @@ class SpokenDialogTokenizer(SpokenNormalizer):
     def pad_token_id(self):
         return self._tokenizer.pad_token_id
 
+    @property
+    def bos_token(self):
+        return self._tokenizer.bos_token
+
+    @property
+    def bos_token_id(self):
+        return self._tokenizer.bos_token_id
+
     def __init__(
-            self,
-            pretrained_model_name_or_path: str = "gpt2",
-            normalization=True,
-            tokens=None,
+        self,
+        pretrained_model_name_or_path: str = "gpt2",
+        normalization=True,
+        tokens=None,
+        device="cpu",
+        token=None,
     ):
         super().__init__()
         self.name_or_path = pretrained_model_name_or_path
-        self._tokenizer = AutoTokenizer.from_pretrained(
-            pretrained_model_name_or_path, max_model_input_sizes=None
-        )
+        if "meta-llama" in pretrained_model_name_or_path:
+            self._tokenizer = LlamaTokenizerFast.from_pretrained(
+                pretrained_model_name_or_path,
+                max_model_input_sizes=None,
+                add_bos_token=False,
+                token=token,
+            )
+        else:
+            self._tokenizer = AutoTokenizer.from_pretrained(
+                pretrained_model_name_or_path,
+                max_model_input_sizes=None,
+                add_bos_token=False,
+            )
         self.normalization = normalization
+        self.device = device
+        self.sp1_token_id = 0
+        self.sp2_token_id = 1
 
         # Set to large number to avoid warnings
         # Manually keep track of your models maximum input length
         self._tokenizer.model_max_length = 1e30
 
         if tokens is not None:
-            TS_TOKENS['additional_special_tokens'] = tokens
+            TS_TOKENS["additional_special_tokens"] = tokens
 
         # This goes in logging
         num_added_toks = self._tokenizer.add_special_tokens(TS_TOKENS)
 
-        s = "Tokenizer initialization:\n"
+        s = f"Tokenizer initialization (pid={os.getpid()})\n"
+        s += f"Add bos token set to {self._tokenizer.add_bos_token}\n"
         s += f"\tWe added {num_added_toks} tokens -> Special token map\n"
         for k, v in self._tokenizer.special_tokens_map.items():
             s += f"\t{k}: {v}\n"
         logger.info(s)
-        print(s)
+
+    def __str__(self):
+        return f"{self.name_or_path}"
 
     def __repr__(self):
         return self._tokenizer.__repr__()
@@ -141,12 +167,13 @@ class SpokenDialogTokenizer(SpokenNormalizer):
         return string
 
     def __call__(
-            self,
-            text: Union[str, List[str], List[List[str]]],
-            return_token_type_ids: bool = True,
-            include_pre_space: bool = False,
-            include_end_ts: bool = True,
-            **kwargs,
+        self,
+        text: Union[str, List[str], List[List[str]]],
+        return_token_type_ids: bool = True,
+        include_pre_space: bool = False,
+        include_end_ts: bool = True,
+        end_ts: Union[str, None] = None,
+        **kwargs,
     ) -> BatchEncoding:
         """
         SpokenDialogTokenizer tokenization.
@@ -159,6 +186,8 @@ class SpokenDialogTokenizer(SpokenNormalizer):
         `text` is List[List[str]]:  multiple dialogs (lists of strings) (no eos_tokens)
 
         """
+        if end_ts is None:
+            end_ts = self.eos_token
 
         # List of lists
         if isinstance(text, list) and isinstance(text[0], list):
@@ -171,7 +200,7 @@ class SpokenDialogTokenizer(SpokenNormalizer):
                 )
 
                 for k, v in o.items():
-                    if not k in ret:
+                    if k not in ret:
                         ret[k] = []
                     ret[k].append(v)
             return ret
@@ -183,13 +212,12 @@ class SpokenDialogTokenizer(SpokenNormalizer):
                 dialog_string = " "
             dialog_string += self.normalize(text[0])
             if len(text) > 1:
-                dialog_string += self.eos_token
+                dialog_string += end_ts
                 for text_string in text[1:-1]:
-                    dialog_string += " " + \
-                        self.normalize(text_string) + self.eos_token
+                    dialog_string += " " + self.normalize(text_string) + end_ts
                 dialog_string += " " + self.normalize(text[-1])
             if include_end_ts:
-                dialog_string += self.eos_token
+                dialog_string += end_ts
             text = dialog_string
         else:
             text = self.normalize(text)
@@ -199,7 +227,47 @@ class SpokenDialogTokenizer(SpokenNormalizer):
             **kwargs,
         )
 
+        if return_token_type_ids:
+            encoding["speaker_ids"] = self._extract_speaker_states(
+                encoding["input_ids"], end_ts=end_ts
+            )
+
         return encoding
+
+    def _extract_speaker_states(self, input_ids, end_ts=None):
+        if end_ts is None:
+            end_ts = self.eos_token_id
+        if isinstance(end_ts, str):
+            end_ts = self._tokenizer.convert_tokens_to_ids(end_ts)
+
+        # extract speaker states
+        back_to_list = False
+        if not isinstance(input_ids, torch.Tensor):
+            input_ids = torch.tensor(input_ids).unsqueeze(0)  # with batch dim
+            back_to_list = True
+        # initialize with speaker 1
+        speaker_ids = torch.ones_like(input_ids) * self.sp1_token_id
+        batch, eos_idx = torch.where(input_ids == end_ts)
+        for b in batch.unique():
+            tmp_eos = eos_idx[batch == b]
+            if len(tmp_eos) == 1:
+                speaker_ids[b, eos_idx + 1 :] = self.sp2_token_id
+            else:
+                start = tmp_eos[0]
+                for i, eos in enumerate(tmp_eos[1:]):
+                    if i % 2 == 0:
+                        sp = self.sp2_token_id
+                        speaker_ids[b, start + 1 : eos + 1] = sp
+                    start = eos
+                if i % 2 == 1:  # add sp2 tokens after last eos if i is odd
+                    speaker_ids[b, start + 1 :] = self.sp2_token_id
+
+        if back_to_list:
+            speaker_ids = speaker_ids.squeeze().tolist()
+            if isinstance(speaker_ids, int):
+                speaker_ids = [speaker_ids]
+
+        return speaker_ids
 
     def idx_to_tokens(self, ids):
         def list_ids_to_string(ids):
@@ -218,8 +286,7 @@ class SpokenDialogTokenizer(SpokenNormalizer):
             else:
                 ret = list_ids_to_string(ids)
         else:
-            ret = self.convert_tokens_to_string(
-                self.convert_ids_to_tokens(ids))
+            ret = self.convert_tokens_to_string(self.convert_ids_to_tokens(ids))
         return ret
 
     def pad(self, *args, **kwargs):
@@ -243,8 +310,8 @@ class SpokenDialogTokenizer(SpokenNormalizer):
     def decode(self, *args, **kwargs):
         return self._tokenizer.decode(*args, **kwargs)
 
-    def set_padding_side(self, padding_side='left'):
-        if padding_side not in {'left', 'right'}:
+    def set_padding_side(self, padding_side="left"):
+        if padding_side not in {"left", "right"}:
             return
 
         self._tokenizer.padding_side = padding_side
@@ -252,3 +319,9 @@ class SpokenDialogTokenizer(SpokenNormalizer):
     @property
     def special_tokens(self):
         return self._tokenizer.additional_special_tokens
+
+    def is_special_token(self, token):
+        return token in self.special_tokens
+
+    def apply_chat_template(self, *args, **kwargs):
+        return self._tokenizer.apply_chat_template(*args, **kwargs)

@@ -103,7 +103,7 @@ def sample_next_dual_token(logitsA, logitsB, top_p=-1, top_k=-1):
 def update_speaker_idsA(batch, tokenizer):
     def _change_speakers(last_speaker, indices, tokenizer):
         for ind in indices:
-            last_speaker[ind] = 0 if last_speaker[ind] == 1  else 1
+            last_speaker[ind] = 0 if last_speaker[ind] == 1 else 1
         return last_speaker
 
     next_speaker = batch["token_type_idsA"][:, -1]
@@ -114,6 +114,7 @@ def update_speaker_idsA(batch, tokenizer):
             next_speaker.clone(), change_speaker_idx, tokenizer
         )
     return next_speaker
+
 
 def update_speaker_idsB(batch, tokenizer):
     def _change_speakers(last_speaker, indices, tokenizer):
@@ -130,10 +131,9 @@ def update_speaker_idsB(batch, tokenizer):
         )
     return next_speaker
 
-@torch.no_grad
-def generate_sample(model, context, n_steps=20, top_p=0.9, top_k=50, n_trajectories=1, stop_at_eos=False):
-    device = model.device
 
+@torch.no_grad
+def generate_sample(model, context, n_steps=20, top_p=0.9, top_k=50, n_trajectories=1, stop_at_eos=False, device="cuda"):
     if isinstance(context, str):
         batch = model.tokenize_strings(context)
     else:
@@ -169,15 +169,6 @@ def generate_sample(model, context, n_steps=20, top_p=0.9, top_k=50, n_trajector
 
     n = 0
     while n < n_steps:
-        if batch['input_idsA'].shape[-1] != 256:
-            pass
-
-        if batch['input_idsA'].shape != batch['input_idsB'].shape:
-            pass
-        if batch['token_type_idsA'].shape != batch['token_type_idsB'].shape:
-            pass
-        if batch['input_idsA'].shape != batch['token_type_idsA'].shape:
-            pass
         batch = model.prepare_inputs_for_generation(**batch)
         batch['use_cache'] = True
         out = model(**batch)
@@ -215,18 +206,17 @@ def generate_sample(model, context, n_steps=20, top_p=0.9, top_k=50, n_trajector
         batch["input_idsB"] = next_tokenB.unsqueeze(-1)
 
         # Update Next Speaker (i.e. `token_type_ids`)
-        if model.include_speaker_tokens:
-            next_speakerA = update_speaker_idsA(batch, model.tokenizer)
-            next_speakerB = update_speaker_idsB(batch, model.tokenizer)
-            generated["token_type_idsA"] = torch.cat(
-                (generated["token_type_idsA"], next_speakerA.unsqueeze(-1)), dim=-1
-            )
-            batch["token_type_idsA"] = next_speakerA.unsqueeze(-1)
+        next_speakerA = update_speaker_idsA(batch, model.tokenizer)
+        next_speakerB = update_speaker_idsB(batch, model.tokenizer)
+        generated["token_type_idsA"] = torch.cat(
+            (generated["token_type_idsA"], next_speakerA.unsqueeze(-1)), dim=-1
+        )
+        batch["token_type_idsA"] = next_speakerA.unsqueeze(-1)
 
-            generated["token_type_idsB"] = torch.cat(
-                (generated["token_type_idsB"], next_speakerB.unsqueeze(-1)), dim=-1
-            )
-            batch["token_type_idsB"] = next_speakerB.unsqueeze(-1)
+        generated["token_type_idsB"] = torch.cat(
+            (generated["token_type_idsB"], next_speakerB.unsqueeze(-1)), dim=-1
+        )
+        batch["token_type_idsB"] = next_speakerB.unsqueeze(-1)
 
         is_eosA = next_tokenA == model.tokenizer.eos_token_id
         is_eosB = next_tokenB == model.tokenizer.eos_token_id
@@ -245,11 +235,10 @@ def generate_sample(model, context, n_steps=20, top_p=0.9, top_k=50, n_trajector
             completed["input_idsB"].append(generated["input_idsB"][done])
             completed["probsA"].append(generated["probsA"][done])
             completed["probsB"].append(generated["probsB"][done])
-            if model.include_speaker_tokens:
-                completed["token_type_idsA"].append(
-                    generated["token_type_idsA"][done])
-                completed["token_type_idsB"].append(
-                    generated["token_type_idsB"][done])
+            completed["token_type_idsA"].append(
+                generated["token_type_idsA"][done])
+            completed["token_type_idsB"].append(
+                generated["token_type_idsB"][done])
 
             if keepA.nelement() == 0 and keepB.nelement() == 0:  # We have completed the sampling of all batches
                 generated["input_idsA"] = []
@@ -266,16 +255,16 @@ def generate_sample(model, context, n_steps=20, top_p=0.9, top_k=50, n_trajector
 
                 generated["input_idsB"] = generated["input_idsB"][keep]
                 generated["probsB"] = generated["probsB"][keep]
-                if model.include_speaker_tokens:
-                    generated["token_type_idsA"] = generated["token_type_idsA"][keep]
-                    generated["token_type_idsB"] = generated["token_type_idsB"][keep]
+
+                generated["token_type_idsA"] = generated["token_type_idsA"][keep]
+                generated["token_type_idsB"] = generated["token_type_idsB"][keep]
 
                 # update the next model inputs to omit the completed samples
                 batch["input_idsA"] = batch["input_idsA"][keep]
                 batch["input_idsB"] = batch["input_idsB"][keep]
-                if model.include_speaker_tokens:
-                    batch["token_type_idsA"] = batch["token_type_idsA"][keep]
-                    batch["token_type_idsB"] = batch["token_type_idsB"][keep]
+
+                batch["token_type_idsA"] = batch["token_type_idsA"][keep]
+                batch["token_type_idsB"] = batch["token_type_idsB"][keep]
 
                 # Update past_key_values
                 new_pastA = []
@@ -304,14 +293,12 @@ def generate_sample(model, context, n_steps=20, top_p=0.9, top_k=50, n_trajector
     if len(generated["input_idsA"]) > 0:
         completed["input_idsA"].append(generated["input_idsA"])
         completed["probsA"].append(generated["probsA"])
-        if model.include_speaker_tokens:
-            completed["token_type_idsA"].append(generated["token_type_idsA"])
+        completed["token_type_idsA"].append(generated["token_type_idsA"])
 
     if len(generated["input_idsB"]) > 0:
         completed["input_idsB"].append(generated["input_idsB"])
         completed["probsB"].append(generated["probsB"])
-        if model.include_speaker_tokens:
-            completed["token_type_idsB"].append(generated["token_type_idsB"])
+        completed["token_type_idsB"].append(generated["token_type_idsB"])
 
         # Stack all the sampled data
     if stop_at_eos:
@@ -394,14 +381,14 @@ def generate_sample(model, context, n_steps=20, top_p=0.9, top_k=50, n_trajector
                 new_probs.append(completed["probsB"][i])
 
         completed["input_idsB"] = torch.cat(new_inp).int()
-        completed["speaker_idsB"] = torch.cat(new_sp)
+        completed["token_type_idsB"] = torch.cat(new_sp)
         completed["probsB"] = torch.cat(new_probs)
         completed["most_likelyB"] = completed["probsB"].log().sum(
             dim=-1).argmax()
         completed["tokensB"] = tokens
     else:
         completed["input_idsB"] = torch.cat(completed["input_idsB"]).int()
-        completed["speaker_idsB"] = torch.cat(completed["speaker_idsB"])
+        completed["token_type_idsB"] = torch.cat(completed["token_type_idsB"])
         completed["probsB"] = torch.cat(completed["probsB"])
         p = completed["probsB"].log().sum(dim=-1)
         completed["most_likelyB"] = p.argmax()
@@ -427,6 +414,7 @@ def generate(model,
              top_k=50,
              stop_at_eos=False,
              strategy='sampling',
+             device='cuda',
              **kwargs):
     return generate_sample(model,
                            context,
@@ -434,4 +422,44 @@ def generate(model,
                            top_p=top_p,
                            top_k=top_k,
                            n_trajectories=n_trajectories,
-                           stop_at_eos=stop_at_eos)
+                           stop_at_eos=stop_at_eos,
+                           device=device)
+
+
+def copy_dict(speaker_dialog, tokenizer):
+    new_dict = {}
+    for k, v in speaker_dialog.items():
+        if k == "input_ids":
+            new_dict[k] = torch.full_like(
+                v, tokenizer.convert_tokens_to_ids("<emp>"))
+            continue
+        elif k == "attention_mask":
+            new_dict[k] = torch.ones_like(v)
+            continue
+        elif k == "speaker_ids":
+            new_dict[k] = torch.zeros_like(v)
+            continue
+        elif k == "token_type_ids":
+            new_dict[k] = torch.zeros_like(v)
+            continue
+
+        new_dict[k] = v.clone()
+
+    return new_dict
+
+
+def tokenize(tokenizer, text, device="cuda", **kwargs):
+    speakerA = tokenizer(text, return_tensors="pt")
+    speakerB = copy_dict(speakerA, tokenizer)
+
+    speakerA = {k: v.to(device) for k, v in speakerA.items()}
+    speakerB = {k: v.to(device) for k, v in speakerB.items()}
+
+    assert (speakerA["input_ids"].shape ==
+            speakerB["input_ids"].shape), (speakerA["input_ids"].shape, speakerB["input_ids"].shape)
+    assert (speakerA["attention_mask"].shape ==
+            speakerB["attention_mask"].shape)
+    assert (speakerA["speaker_ids"].shape ==
+            speakerB["speaker_ids"].shape)
+
+    return {'speakerA': speakerA, 'speakerB': speakerB}
