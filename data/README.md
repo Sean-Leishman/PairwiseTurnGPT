@@ -47,6 +47,10 @@ python spoken_dm.py --dataset switchboard --split train --show-output --process 
 python spoken_dm.py --dataset switchboard --split train --show-output --process "serialised" --combine-speaker
 ```
 
+We can output the preprocessed data by specifying the `--write-output` flag to either `multi` or `single` to write the data to a file.
+Each option specific whether the data is written as a single line (no line breaks between turns) or multiple lines (line breaks between turns).
+The output has been written to the `data/examples` directory.
+
 ### Processors
 Processors are used to pre-process the data in different ways.
 The `aligned` processor forces turns to be time aligned so that the start and end of turns can be overlapped.
@@ -61,7 +65,6 @@ Also, the two channels can be combined into a single channel via `combine_speake
 Each dataset has its own pre-processing pipeline that is used to convert the raw data into a format that can be processed later.
 This involves assigning speaker roles, removing unwanted tokens and assigning utterance and word-level timings.
 These timings allow us to distinguish and divide the utterances into their main turns, backchannels and overlaps.
-
 
 ## `written_dm.py`
 Contains the dataset manager for the written dialog datasets.
