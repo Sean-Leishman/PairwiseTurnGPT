@@ -133,8 +133,8 @@ class PairwiseTrainer(Trainer):
 
         out = self._step(ds)
 
-        input_idsA = ds["speakerA"]["input_ids"]
-        input_idsB = ds["speakerB"]["input_ids"]
+        input_idsA = ds["speakerA"]["input_ids"].detach()
+        input_idsB = ds["speakerB"]["input_ids"].detach()
 
         figs = []
         global_steps = []
@@ -158,8 +158,8 @@ class PairwiseTrainer(Trainer):
 
         step = 50
         for batch_idx in range(len(input_idsA)):
-            probsA = [log.softmax(dim=-1)[batch_idx] for log in logitsA]
-            probsB = [log.softmax(dim=-1)[batch_idx] for log in logitsB]
+            probsA = [log.softmax(dim=-1).detach()[batch_idx] for log in logitsA]
+            probsB = [log.softmax(dim=-1).detach()[batch_idx] for log in logitsB]
 
             for idx in range(0, len(input_idsA[batch_idx]), step):
                 pA = [x[idx : idx + step] for x in probsA]
