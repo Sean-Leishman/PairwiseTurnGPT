@@ -133,8 +133,8 @@ class PairwiseTrainer(Trainer):
 
         out = self._step(ds)
 
-        input_idsA = ds["speakerA"]["input_ids"].detach()
-        input_idsB = ds["speakerB"]["input_ids"].detach()
+        input_idsA = ds["speakerA"]["input_ids"]
+        input_idsB = ds["speakerB"]["input_ids"]
 
         figs = []
         global_steps = []
@@ -153,13 +153,17 @@ class PairwiseTrainer(Trainer):
         ]
         tokens.append(self.model.tokenizer.convert_tokens_to_ids("<eot>"))
 
-        logitsA = [out.logits[0][..., token_id].cpu() for token_id in tokens]
-        logitsB = [out.logits[1][..., token_id].cpu() for token_id in tokens]
+        raw_probsA = [
+            out.logits[0].softmax(dim=-1)[..., token_id].cpu() for token_id in tokens
+        ]
+        raw_probsB = [
+            out.logits[1].softmax(dim=-1)[..., token_id].cpu() for token_id in tokens
+        ]
 
         step = 50
         for batch_idx in range(len(input_idsA)):
-            probsA = [log.softmax(dim=-1).detach()[batch_idx] for log in logitsA]
-            probsB = [log.softmax(dim=-1).detach()[batch_idx] for log in logitsB]
+            probsA = [prob[batch_idx] for prob in raw_probsA]
+            probsB = [prob[batch_idx] for prob in raw_probsB]
 
             for idx in range(0, len(input_idsA[batch_idx]), step):
                 pA = [x[idx : idx + step] for x in probsA]

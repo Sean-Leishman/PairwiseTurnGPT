@@ -13,7 +13,7 @@ import json
 from switchboard import SwitchboardDataset
 from fisher import FisherDataset
 from edacc import EdAccDataset
-from data.utils import get_abs_path, pp_pair_dialogs
+from data.utils import get_abs_path, str_pair_dialogs
 from aligned_process import AlignedProcess
 from serialised_process import SerialisedProcess, to_serialised_process_type
 from base import DialogDMInterface, Datasets, TurnID, Turn
@@ -628,9 +628,15 @@ class SpokenDM(DialogDMInterface):
 
             continue
 
-    def show_input_iterator(self, batch=None, conv_id=None, allow_multi_lines=True):
+    def show_input_iterator(
+        self, batch=None, conv_id=None, save_to=None, allow_multi_lines=True
+    ):
         if batch is None and conv_id is None:
             raise ValueError("Either batch or conv_id must be provided")
+
+        if save_to is not None:
+            with open(save_to, "w") as f:
+                f.write("")
 
         if batch is None:
             batch = [x for x in self.data if conv_id in x["speakerA"]["conv_id"]]
@@ -723,7 +729,8 @@ class SpokenDM(DialogDMInterface):
             othersB["turn_end_types"] = otherB
             othersB["speaker_ids"] = speaker_idsB
 
-            _, columns, _ = pp_pair_dialogs(
+            outA, _, columns, _ = str_pair_dialogs(
+                "",
                 self.tokenizer,
                 input_idsA,
                 timings=timingsA,
@@ -733,7 +740,8 @@ class SpokenDM(DialogDMInterface):
                 others=othersA,
                 width=os.get_terminal_size().columns if allow_multi_lines else -1,
             )
-            start, _, _ = pp_pair_dialogs(
+            outB, start, _, _ = str_pair_dialogs(
+                "",
                 self.tokenizer,
                 input_idsB,
                 timings=timingsB,
@@ -744,7 +752,19 @@ class SpokenDM(DialogDMInterface):
                 columns=columns,
                 width=os.get_terminal_size().columns if allow_multi_lines else -1,
             )
+            print(outA)
+            print(outB)
+            if save_to is not None:
+                with open(save_to, "a") as f:
+                    f.write(outA)
+                    f.write("\n")
+                    f.write(outB)
+                    f.write("\n")
+
             print()
+            if save_to is not None:
+                with open(save_to, "a") as f:
+                    f.write("\n")
 
             if start >= end:
                 break
@@ -926,7 +946,13 @@ if __name__ == "__main__":
                 i += 1
     elif args.write_output is not None:
         for i in range(len(gd)):
-            gd.show_input(gd[i], allow_multi_lines=args.write_output == "multi")
+            gd.show_input(
+                gd[i],
+                save_to=get_abs_path(
+                    f"examples/{args.write_output}_{gd[i]['speakerA']['conv_id']}.txt"
+                ),
+                allow_multi_lines=args.write_output == "multi",
+            )
 
     else:
         dl = DataLoader(gd, batch_size=4, collate_fn=gd.collate_fn, shuffle=True)

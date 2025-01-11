@@ -25,4 +25,5 @@ model/
 build/
 *.pt
 **/wandb/
-data/.cache/GPT2TokenizerFast
+data/.cache/
+data/trained_model/
