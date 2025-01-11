@@ -622,16 +622,23 @@ class SpokenDM(DialogDMInterface):
 
         return False
 
-    def show_input(self, batch=None, conv_id=None, save_to=None):
+    def show_input(
+        self, batch=None, conv_id=None, save_to=None, allow_multi_lines=True
+    ):
         for item in self.show_input_iterator(
-            batch=batch, conv_id=conv_id, save_to=save_to
+            batch=batch,
+            conv_id=conv_id,
+            save_to=save_to,
+            allow_multi_lines=allow_multi_lines,
         ):
             if item is None:
                 break
 
             continue
 
-    def show_input_iterator(self, batch=None, conv_id=None, save_to=None):
+    def show_input_iterator(
+        self, batch=None, conv_id=None, save_to=None, allow_multi_lines=True
+    ):
         if batch is None and conv_id is None:
             raise ValueError("Either batch or conv_id must be provided")
 
@@ -739,7 +746,7 @@ class SpokenDM(DialogDMInterface):
                 token_types=typesA,
                 speaker="A",
                 others=othersA,
-                width=os.get_terminal_size().columns,
+                width=os.get_terminal_size().columns if allow_multi_lines else -1,
             )
             outB, start, _, _ = str_pair_dialogs(
                 "",
@@ -751,7 +758,7 @@ class SpokenDM(DialogDMInterface):
                 others=othersB,
                 speaker="B",
                 columns=columns,
-                width=os.get_terminal_size().columns,
+                width=os.get_terminal_size().columns if allow_multi_lines else -1,
             )
 
             print(outA)
@@ -815,6 +822,12 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--show-output", action="store_true", help="Show the processing output"
+    )
+    parser.add_argument(
+        "--write-output",
+        type=str,
+        choices=["multi", "single"],
+        help="Write the processing output to a file on multiple lines or a single line",
     )
     parser.add_argument(
         "--datasets",
@@ -943,5 +956,14 @@ if __name__ == "__main__":
                 )
                 i += 1
 
+    elif args.write_output is not None:
+        for i in range(len(gd)):
+            gd.show_input(
+                gd[i],
+                save_to=get_abs_path(
+                    f"examples/{args.write_output}_{gd[i]['speakerA']['conv_id']}.txt"
+                ),
+                allow_multi_lines=args.write_output == "multi",
+            )
     else:
         dl = DataLoader(gd, batch_size=4, collate_fn=gd.collate_fn, shuffle=True)

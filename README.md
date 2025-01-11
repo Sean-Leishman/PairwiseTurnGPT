@@ -1,4 +1,5 @@
 # PairwiseTurnGPT
+[Paper](https://www.semdial.org/anthology/Z24-Leishman_semdial_0002.pdf) Accepted at [SemDial 2024](https://www.semdial.org/).
 
 This repository contains the code for PairwiseTurnGPT, an End-of-turn detection model trained on the Switchboard corpus
 PairwiseTurnGPT is based on the work of [TurnGPT](https://github.com/ErikEkstedt/TurnGPT) but modifies the model and spoken dialogue processing to effectively model speaker interactions in overlapping utterances.
@@ -9,6 +10,8 @@ The model itself is based on the GPT-2 architecture but uses a dual-transformer 
 
 For easy comparison, the original TurnGPT model has been cloned in this repository within the `gptonly` folder.
 The `pairwisegpt` folder contains the code for PairwiseTurnGPT.
+
+> Note: The repository that generated the results for the paper is available on branch [old](https://github.com/Sean-Leishman/PairwiseTurnGPT/tree/old). The `master` branch contains refactored code for easier readability and maintainability.
 
 ## Setup
 Ran and tested on a ubuntu-based linux machine with conda.
@@ -47,7 +50,6 @@ Each contains:
 - trainer.py: contains main train and testing loops
 - model.py: contains model intialisation and tokenization initialisation
 - gpt.py: contains model architecture modified from original [Hugging Face](https://github.com/huggingface/transformers/blob/v4.39.3/src/transformers/models/gpt2/modeling_gpt2.py) version
-- metrics.py: contains classes for tracking metrics
 - evaluate.py: miscellaneous code for experiments related to generation and artifical removals of overlaps
 - generate.py: written for the original [TurnGPT](https://github.com/ErikEkstedt/TurnGPT), adapted for dual stream tokens
 - utils.py: miscellaneous code with functions from original [TurnGPT](https://github.com/ErikEkstedt/TurnGPT)
@@ -60,6 +62,8 @@ The data folder contains the necessary code for loading and running functions
 - serialised_processor.py: contains the main data module for serialising the spoken dialogues in a single-channel manner
 - switchboard/switchboard.py: adapted from original [TurnGPT](https://github.com/ErikEkstedt/TurnGPT) calling additional functions for pairwise approach
 - switchboard/utils.py: adapted from original [TurnGPT](https://github.com/ErikEkstedt/TurnGPT) with pairiwse setup and retaining phenomna
+
+The `common/metrics` folder contains the necessary code for calculating metrics (only for `PairwiseTurnGPT`)
 
 ## Data
 Switchboard data is aquired from [https://www.inf.ed.ac.uk/resources/corpora/](https://www.inf.ed.ac.uk/resources/corpora/) for Switchboard.

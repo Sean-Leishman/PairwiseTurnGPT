@@ -92,24 +92,27 @@ def str_pair_dialogs(
 ):
     max_len = 20
     num_of_columns = 0
-    if columns == -1:
-        tokens = tokenizer.convert_ids_to_tokens(input_ids[start:])
-        for idx in range(start, len(input_ids)):
-            tok = tokens[idx - start]
-            max_len = max(max_len, len(str(tok)))
+    if width != -1:
+        if columns == -1:
+            tokens = tokenizer.convert_ids_to_tokens(input_ids[start:])
+            for idx in range(start, len(input_ids)):
+                tok = tokens[idx - start]
+                max_len = max(max_len, len(str(tok)))
 
-            num_of_columns = idx - start + 1
-            if column_width + num_of_columns * max_len > width:
-                num_of_columns -= 1
-                break
+                num_of_columns = idx - start + 1
+                if column_width + num_of_columns * max_len > width:
+                    num_of_columns -= 1
+                    break
 
-        max_len = (width - 10) // (num_of_columns + 1)
+            max_len = (width - 10) // (num_of_columns + 1)
+        else:
+            num_of_columns = columns
+            max_len = (width - 10) // (num_of_columns + 1)
+
+        if num_of_columns == 0:
+            return curr_str, start, False
     else:
-        num_of_columns = columns
-        max_len = (width - 10) // (num_of_columns + 1)
-
-    if num_of_columns == 0:
-        return curr_str, start, False
+        num_of_columns = len(input_ids) - start
 
     curr = [start, start + num_of_columns]
     start = curr[1]
