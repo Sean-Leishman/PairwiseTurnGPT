@@ -801,7 +801,6 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--write-output",
-        action="store_true",
         help="Write the processing output. Either requires `multi` or `single`",
         choices=["multi", "single"],
     )
