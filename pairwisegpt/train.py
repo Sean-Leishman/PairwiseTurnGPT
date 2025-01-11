@@ -308,7 +308,6 @@ def load_ds(config, model, split="val", end_of_utterance_tokens=["<ebc>", "<eint
         ds = DialogDM(
             split=split,
             tokenizer=model.get_tokenizer(),
-            overwrite=config.overwrite,
             load_from_cache=not config.overwrite,
             include_overlaps=True,
             include_backchannels=True,
@@ -328,7 +327,6 @@ def load_ds(config, model, split="val", end_of_utterance_tokens=["<ebc>", "<eint
         ds = DialogDM(
             split=split,
             tokenizer=model.get_tokenizer(),
-            overwrite=config.overwrite,
             load_from_cache=not config.overwrite,
             serialised=SerialisedProcessType.TurnEnd,
             method="serialised",
@@ -541,15 +539,13 @@ def validate_args(config):
             config.end_of_utterance_tokens.append("<eint>")
 
     if config.no_emp_tokens:
-        if "<emp>" in config.filter_special_tokens:
-            config.filter_special_tokens.remove("<emp>")
+        if "<emp>" not in config.filter_special_tokens:
+            config.filter_special_tokens.append("<emp>")
     if config.filter_bc_overlap_token:
-        if "<bc>" in config.filter_special_tokens:
-            config.filter_special_tokens.remove("<bc>")
-        if "<eint>" in config.filter_special_tokens:
-            config.filter_special_tokens.remove("<eint>")
-        if "<ebc>" in config.filter_special_tokens:
-            config.filter_special_tokens.remove("<ebc>")
+        if "<eint>" not in config.filter_special_tokens:
+            config.filter_special_tokens.append("<eint>")
+        if "<ebc>" not in config.filter_special_tokens:
+            config.filter_special_tokens.append("<ebc>")
 
     if config.datasets is not None and len(config.datasets) > 0:
         logging.getLogger(__name__).warning(
@@ -569,9 +565,9 @@ if __name__ == "__main__":
     parser = build_parser()
     config = parser.parse_args()
 
-    logger.info(f"{config}")
-
     config = validate_args(config)
+    logger.info(f"Config: {config}")
+
     if config == -1:
         logger.error(f"Invalid config setting {config}")
         exit(-1)

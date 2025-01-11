@@ -108,6 +108,33 @@ def insert_bc_channel(
         new_turns.append(turn)
         turn_idx, turn = next(turn_iterator)
 
+    while bc is not None:
+        bc_word = (
+            "<bc>" if bc_token is not None else " ".join(x["word"].lower() for x in bc)
+        )
+
+        new_turn = Turn(
+            word=bc_word,
+            turn_type=TurnType.BACKCHANNEL,
+            turn_end_type=TurnEndType.NONE,
+            start=bc[0]["start"],
+            end=bc[-1]["end"],
+            speaker=speaker,
+            conv_id=bc[0]["conv_id"],
+            turn_index=len(new_turns),
+        )
+        new_turns.append(new_turn)
+
+        if bc_token is not None:
+            bcs[bc_idx][0]["word"] = bc_word
+            bcs[bc_idx][0]["tokens"] = bc_token
+            bcs[bc_idx][0]["end"] = bc[-1]["end"]
+            if len(bcs[bc_idx]) > 1:
+                bcs[bc_idx] = bcs[bc_idx][:1]
+
+        new_dialog.append(bcs[bc_idx])
+        bc_idx, bc = next(bc_iterator)
+
     return new_dialog, new_turns
 
 
@@ -121,7 +148,6 @@ def insert_overlap_channel(
     _, overlap = next(overlap_iterator)
 
     new_dialog, new_turns = [], []
-    overlap_idxs_in_dialog = []
 
     while turn is not None:
         if overlap is not None and turn["start"] > overlap[0]["start"]:
@@ -140,7 +166,6 @@ def insert_overlap_channel(
                 )
             )
             new_dialog.append(overlap)
-            overlap_idxs_in_dialog.append(len(new_dialog) - 1)
 
             _, overlap = next(overlap_iterator)
             continue
@@ -148,6 +173,22 @@ def insert_overlap_channel(
         new_dialog.append(dialog[turn_idx])
         new_turns.append(turn)
         turn_idx, turn = next(turn_iterator)
+
+    while overlap is not None:
+        new_turns.append(
+            Turn(
+                word=" ".join(x["word"].lower() for x in overlap),
+                turn_type=TurnType.OVERLAP,
+                turn_end_type=TurnEndType.NONE,
+                start=overlap[0]["start"],
+                end=overlap[-1]["end"],
+                speaker=speaker,
+                conv_id=overlap[0]["conv_id"],
+                turn_index=len(new_turns),
+            )
+        )
+        new_dialog.append(overlap)
+        _, overlap = next(overlap_iterator)
 
     return new_dialog, new_turns
 
@@ -184,7 +225,7 @@ class AlignedProcess(Process):
         include_backchannels=False,
         include_overlaps=False,
         include_bc_token=False,
-        remove_special_tokens=False,
+        filter_special_tokens=[],
         yield_int_thresh=0.1,
         yield_overlap_thresh=0.5,
         max_length=256,
@@ -202,10 +243,9 @@ class AlignedProcess(Process):
         self.include_overlaps = include_overlaps
         self.include_bc_token = include_bc_token
 
+        self.filter_special_tokens = filter_special_tokens
+
         self.include_yield_token = "<yield>" in end_of_utterance_tokens
-
-        self.remove_special_tokens = remove_special_tokens
-
         self.yield_int_thresh = yield_int_thresh
         self.yield_overlap_thresh = yield_overlap_thresh
 
@@ -398,9 +438,13 @@ class AlignedProcess(Process):
         for key in diff_keysB:
             del output["speakerB"][key]
 
-        if self.remove_special_tokens:
-            output["speakerA"] = self._remove_special_tokens(output["speakerA"])
-            output["speakerB"] = self._remove_special_tokens(output["speakerB"])
+        if len(self.filter_special_tokens) > 0:
+            output["speakerA"] = self._remove_special_tokens(
+                output["speakerA"], self.filter_special_tokens
+            )
+            output["speakerB"] = self._remove_special_tokens(
+                output["speakerB"], self.filter_special_tokens
+            )
 
         for split_utt in self._split_utterances([output]):
             turns_dict = []
@@ -654,6 +698,8 @@ class AlignedProcess(Process):
                 dialogA, turnsA, bcA, dialogB, turnsB, bcB
             )
 
+        if "4338" in turnsA[0].conv_id:
+            pass
         if self.include_overlaps:
             dialogA, turnsA, dialogB, turnsB = self._insert_overlap(
                 dialogA, turnsA, overlapA, dialogB, turnsB, overlapB
@@ -867,8 +913,12 @@ class AlignedProcess(Process):
                 dialogs["turn_type_ids"].append(turns[turn_idx]["turn_type"])
                 dialogs["turn_end_type_ids"].append(turns[turn_idx]["turn_end_type"])
 
+                if is_special:
+                    turn_idx += 1
+
             elif turn_idx < len(turns) and timing[1] > turns[turn_idx]["end"]:
                 # when updating the turn we should whether the next token is occuring directly after the special token
+                # TODO Fixup here where `in_turn` is set after turn-ending if the other speaker's tokens end prior to the current speaker's turn ending
                 turn_idx += 1
                 if (
                     turn_idx < len(turns)
@@ -891,8 +941,8 @@ class AlignedProcess(Process):
 
         return dialogs
 
-    def _remove_special_tokens(self, data):
-        special_tokens = torch.tensor(self.tokenizer.special_tokens)
+    def _remove_special_tokens(self, data, special_tokens=[]):
+        special_tokens = torch.tensor(special_tokens)
         index = torch.logical_not(torch.isin(data["input_ids"], special_tokens))
 
         for key in data.keys():

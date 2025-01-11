@@ -399,10 +399,10 @@ class Process(ABC):
             self.tokens_dict["emp"] = self.tokenizer.convert_tokens_to_ids("<eot>")
 
         if not self.tokenizer.is_special_token("<speakerA>"):
-            self.tokens_dict["speakerA"] = 0
+            self.tokens_dict["speakerA"] = 1
 
         if not self.tokenizer.is_special_token("<speakerB>"):
-            self.tokens_dict["speakerB"] = 1
+            self.tokens_dict["speakerB"] = 2
 
         if not self.tokenizer.is_special_token("<bc>"):
             self.tokens_dict["bc"] = self.tokenizer.convert_tokens_to_ids("<eot>")

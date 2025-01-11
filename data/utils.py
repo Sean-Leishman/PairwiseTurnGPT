@@ -110,7 +110,7 @@ def str_pair_dialogs(
             max_len = (width - 10) // (num_of_columns + 1)
 
         if num_of_columns == 0:
-            return curr_str, start, False
+            return curr_str, start, 0, False
     else:
         num_of_columns = len(input_ids) - start
 

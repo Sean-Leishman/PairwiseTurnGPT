@@ -224,6 +224,9 @@ class Trainer:
             progress_bar.set_postfix_str(f"avg_train_loss={avg_train_loss}")
             self.global_step += 1
 
+        if not self.dev_mode:
+            self._plot_trp_to_wandb(train_dl)
+
         avg_loss = train_loss / len(train_dl)
 
         metrics = {"avg_train_loss": avg_loss}
@@ -280,7 +283,7 @@ class Trainer:
             metrics, _ = self.metrics.calculate(set_param=is_val, use_param=not is_val)
             metrics["avg_loss"] = loss / len(dl)
 
-            if not self.dev_mode or self.dev_mode:
+            if not self.dev_mode:
                 self._plot_metric_to_wandb()
                 wandb_out = {
                     "val_loss" if is_val else "test_loss": metrics["avg_loss"],

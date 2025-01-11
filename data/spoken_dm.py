@@ -10,15 +10,15 @@ import threading
 import pickle
 import json
 
-from data.switchboard import SwitchboardDataset
-from data.fisher import FisherDataset
-from data.edacc import EdAccDataset
-from data.utils import get_abs_path
+from switchboard import SwitchboardDataset
+from fisher import FisherDataset
+from edacc import EdAccDataset
+from data.utils import get_abs_path, pp_pair_dialogs
 from aligned_process import AlignedProcess
 from serialised_process import SerialisedProcess, to_serialised_process_type
 from base import DialogDMInterface, Datasets, TurnID, Turn
-from data.utils import get_logger, str_pair_dialogs
-from data.tokenizer import SpokenDialogTokenizer
+from utils import get_logger
+from pairwisegpt.tokenizer import SpokenDialogTokenizer
 from huggingface_hub import snapshot_download
 
 from datasets import (
@@ -93,7 +93,7 @@ def BuildProcess(
     serialised=None,
     combine_speaker=False,
     include_partial_overlaps=False,
-    remove_special_tokens=False,
+    filter_special_tokens=[],
     split_utt=True,
     *args,
     **kwargs,
@@ -112,7 +112,7 @@ def BuildProcess(
             no_overlap=False,  # Ensures that lexical content and <eot> token can be aligned
             end_on=to_serialised_process_type(serialised),
             split_utt=split_utt,
-            remove_special_tokens=remove_special_tokens,
+            filter_special_tokens=filter_special_tokens,
             *args,
             **kwargs,
         )
@@ -125,7 +125,14 @@ def BuildProcess(
             tokenizer,
             split_utt=split_utt,
             include_partial_overlaps=include_partial_overlaps,
-            remove_special_tokens=remove_special_tokens,
+            filter_special_tokens=filter_special_tokens,
+            *args,
+            **kwargs,
+        )
+    elif method == "future":
+        return FutureContextProcess(
+            tokenizer,
+            split_utt=split_utt,
             *args,
             **kwargs,
         )
@@ -167,12 +174,12 @@ class SpokenDM(DialogDMInterface):
         tokenizer=None,
         device="cuda:0",
         save_data=True,
-        load_from_hub=True,
+        load_from_hub=False,
         load_from_cache=False,
         max_length=256,
         keep_length=64,
         overlap_length=10,
-        remove_special_tokens=False,
+        filter_special_tokens=[],
         split_utt=True,
         keep_in_memory=False,
         dev_mode=False,
@@ -231,7 +238,7 @@ class SpokenDM(DialogDMInterface):
         self.dev_mode = dev_mode
         self.parse_dialogs = parse_dialogs
 
-        self.remove_special_tokens = remove_special_tokens
+        self.filter_special_tokens = filter_special_tokens
 
         self.processor = BuildProcess(
             self.tokenizer,
@@ -239,7 +246,7 @@ class SpokenDM(DialogDMInterface):
             keep_length=self.keep_length,
             overlap_length=self.overlap_length,
             split_utt=split_utt,
-            remove_special_tokens=self.remove_special_tokens,
+            filter_special_tokens=self.filter_special_tokens,
             include_bc_token=include_bc_token,
             *args,
             **kwargs,
@@ -323,7 +330,6 @@ class SpokenDM(DialogDMInterface):
                     dev_mode=self.dev_mode,
                     parse_dialogs=self.parse_dialogs,
                     keep_in_memory=False,
-                    load_from_hub=self.load_from_hub,
                 )
             elif ds == Datasets.FISHER:
                 self.datasets[ds] = FisherDataset(
@@ -591,7 +597,7 @@ class SpokenDM(DialogDMInterface):
                     "max_length": self.max_length,
                     "keep_length": self.keep_length,
                     "overlap_length": self.overlap_length,
-                    "remove_special_tokens": self.remove_special_tokens,
+                    "filter_special_tokens": self.filter_special_tokens,
                     "processor": self.processor.config_to_dict(),
                     "datasets": [ds.name for ds in self.dataset_keys],
                 },
@@ -622,29 +628,16 @@ class SpokenDM(DialogDMInterface):
 
         return False
 
-    def show_input(
-        self, batch=None, conv_id=None, save_to=None, allow_multi_lines=True
-    ):
-        for item in self.show_input_iterator(
-            batch=batch,
-            conv_id=conv_id,
-            save_to=save_to,
-            allow_multi_lines=allow_multi_lines,
-        ):
+    def show_input(self, batch=None, conv_id=None, **kwargs):
+        for item in self.show_input_iterator(batch=batch, conv_id=conv_id, **kwargs):
             if item is None:
                 break
 
             continue
 
-    def show_input_iterator(
-        self, batch=None, conv_id=None, save_to=None, allow_multi_lines=True
-    ):
+    def show_input_iterator(self, batch=None, conv_id=None, allow_multi_lines=True):
         if batch is None and conv_id is None:
             raise ValueError("Either batch or conv_id must be provided")
-
-        if save_to is not None:
-            with open(save_to, "w") as f:
-                f.write("")
 
         if batch is None:
             batch = [x for x in self.data if conv_id in x["speakerA"]["conv_id"]]
@@ -737,8 +730,7 @@ class SpokenDM(DialogDMInterface):
             othersB["turn_end_types"] = otherB
             othersB["speaker_ids"] = speaker_idsB
 
-            outA, _, columns, _ = str_pair_dialogs(
-                "",
+            _, columns, _ = pp_pair_dialogs(
                 self.tokenizer,
                 input_idsA,
                 timings=timingsA,
@@ -748,8 +740,7 @@ class SpokenDM(DialogDMInterface):
                 others=othersA,
                 width=os.get_terminal_size().columns if allow_multi_lines else -1,
             )
-            outB, start, _, _ = str_pair_dialogs(
-                "",
+            start, _, _ = pp_pair_dialogs(
                 self.tokenizer,
                 input_idsB,
                 timings=timingsB,
@@ -760,19 +751,7 @@ class SpokenDM(DialogDMInterface):
                 columns=columns,
                 width=os.get_terminal_size().columns if allow_multi_lines else -1,
             )
-
-            print(outA)
-            print(outB)
-            if save_to is not None:
-                with open(save_to, "a") as f:
-                    f.write(outA)
-                    f.write("\n")
-                    f.write(outB)
-                    f.write("\n")
             print()
-            if save_to is not None:
-                with open(save_to, "a") as f:
-                    f.write("\n")
 
             if start >= end:
                 break
@@ -780,9 +759,6 @@ class SpokenDM(DialogDMInterface):
             yield start
 
         print("------------------------------------")
-        if save_to is not None:
-            with open(save_to, "a") as f:
-                f.write("------------------------------------\n")
 
 
 if __name__ == "__main__":
@@ -803,11 +779,18 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--process",
-        choices=["serialised", "aligned"],
-        default="aligned",
-        help="The process used to generate data. `serialised' processes the data in a serialised manner for use with turngpt. `aligned' processes the data in an aligned manner for use with pairwisegpt.",
+        choices=["serialised", "aligned", "future"],
+        default=None,
+        help="The process used to generate data. `serialised' processes the data in a serialised manner for use with turngpt. `aligned' processes the data in an aligned manner for use with pairwisegpt. `future' processes the data with future context for futture work",
     )
 
+    future_group = parser.add_argument_group("future")
+    future_group.add_argument(
+        "--summarize-method",
+        choices=["NONE", "HF_PROMPT"],
+        default="none",
+        help="The summarization method used to generate data for `future'. `NONE' does not use any summarization. `HF_PROMPT' uses the HuggingFace prompt-based summarization method",
+    )
     serialised_group = parser.add_argument_group("serialised")
     serialised_group.add_argument(
         "--serialised",
@@ -825,9 +808,9 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--write-output",
-        type=str,
+        action="store_true",
+        help="Write the processing output. Either requires `multi` or `single`",
         choices=["multi", "single"],
-        help="Write the processing output to a file on multiple lines or a single line",
     )
     parser.add_argument(
         "--datasets",
@@ -913,7 +896,7 @@ if __name__ == "__main__":
         yield_overlap_thresh=args.yield_overlap_thresh,
         include_bc_token=args.replace_bc_token,
         dev_mode=args.dev_mode,
-        load_from_hub=True,
+        load_from_hub=False,
         split=args.split,
         load_from_cache=args.load_from_cache,
         split_utt=args.split_utt,
@@ -922,6 +905,7 @@ if __name__ == "__main__":
         keep_length=args.keep_length,
         overlap_length=args.overlap_length,
         method=args.process,
+        summarization_method=args.summarize_method,
         end_of_utterance_tokens=(
             ["<ebc>", "<eint>", "<yield>"]
             if args.include_yield_token
@@ -942,28 +926,15 @@ if __name__ == "__main__":
 
             if input_string == "c":
                 conv_id = input("Enter conversation ID: ")
-                gd.show_input(
-                    conv_id=conv_id, save_to=get_abs_path(f"examples/{conv_id}.txt")
-                )
+                gd.show_input(conv_id=conv_id)
             elif input_string == "q":
                 break
             else:
-                gd.show_input(
-                    gd[i],
-                    save_to=get_abs_path(
-                        f"examples/{gd[i]["speakerA"]["conv_id"]}.txt"
-                    ),
-                )
+                gd.show_input(gd[i])
                 i += 1
-
     elif args.write_output is not None:
         for i in range(len(gd)):
-            gd.show_input(
-                gd[i],
-                save_to=get_abs_path(
-                    f"examples/{args.write_output}_{gd[i]['speakerA']['conv_id']}.txt"
-                ),
-                allow_multi_lines=args.write_output == "multi",
-            )
+            gd.show_input(gd[i], allow_multi_lines=args.write_output == "multi")
+
     else:
         dl = DataLoader(gd, batch_size=4, collate_fn=gd.collate_fn, shuffle=True)

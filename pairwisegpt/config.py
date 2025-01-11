@@ -42,6 +42,7 @@ EXPERIMENT_1 = [
         "--evaluate-on-serialised",
         "--no-emp-tokens",
         "--remove-cross-attention",
+        "--remove-emp-metric-generation",
     ],
     # Serialised
     [

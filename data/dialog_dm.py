@@ -53,7 +53,7 @@ class DialogDM(DialogDMInterface):
         datasets=[Datasets.SWITCHBOARD],
         combine_speaker=False,
         remove_speaker_key=False,
-        remove_special_tokens=False,
+        filter_special_tokens=[],
         max_length=256,
         **kwargs,
     ):
@@ -71,31 +71,20 @@ class DialogDM(DialogDMInterface):
 
         self.combine_speaker = combine_speaker
         self.remove_speaker_key = remove_speaker_key
-        self.remove_special_tokens = remove_special_tokens
+        self.filter_special_tokens = filter_special_tokens
         self.max_length = max_length
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         self.dm = []
 
-        if len(conversation_datasets) > 0:
-            self.dm.append(
-                ConversationalDM(
-                    tokenizer=tokenizer,
-                    datasets=conversation_datasets,
-                    combine_speaker=self.combine_speaker,
-                    remove_special_tokens=self.remove_special_tokens,
-                    max_length=self.max_length,
-                    **kwargs,
-                )
-            )
         if len(pairwise_generation_datasets) > 0:
             self.dm.append(
                 SpokenDM(
                     tokenizer=tokenizer,
                     datasets=pairwise_generation_datasets,
                     combine_speaker=self.combine_speaker,
-                    remove_special_tokens=self.remove_special_tokens,
+                    filter_special_tokens=self.filter_special_tokens,
                     max_length=self.max_length,
                     **kwargs,
                 )
