@@ -129,13 +129,6 @@ def BuildProcess(
             *args,
             **kwargs,
         )
-    elif method == "future":
-        return FutureContextProcess(
-            tokenizer,
-            split_utt=split_utt,
-            *args,
-            **kwargs,
-        )
 
     raise ValueError(f"No process specified: {args} {kwargs}")
 
