@@ -1,1 +1,1 @@
-from data.base import Turn, TurnType, TurnEndType
+from pairwise_generation_dm import PairwiseGenerationDM
