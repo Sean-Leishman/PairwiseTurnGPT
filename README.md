@@ -1,5 +1,5 @@
 # PairwiseTurnGPT
-[Paper](https://www.semdial.org/anthology/Z24-Leishman_semdial_0002.pdf) accepted at [SemDial 2024](https://www.semdial.org/).
+> *[Paper](https://www.semdial.org/anthology/Z24-Leishman_semdial_0002.pdf) accepted at [SemDial 2024](https://www.semdial.org/).*
 
 This repository contains the code for PairwiseTurnGPT, an End-of-turn detection model trained on the Switchboard corpus
 PairwiseTurnGPT is based on the work of [TurnGPT](https://github.com/ErikEkstedt/TurnGPT) but modifies the model and spoken dialogue processing to effectively model speaker interactions in overlapping utterances.
