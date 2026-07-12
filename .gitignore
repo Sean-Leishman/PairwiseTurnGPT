@@ -27,3 +27,11 @@ build/
 **/wandb/
 data/.cache/
 data/trained_model/
+
+# memory files are symlinks into the vault (canonical there)
+Notes.md
+LOG.md
+PLAN.md
+DECISIONS.md
+Todo.md
+.vault
